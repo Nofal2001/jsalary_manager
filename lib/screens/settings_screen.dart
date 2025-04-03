@@ -1,7 +1,8 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 import 'package:salary_app/screens/roles_screen.dart';
 import 'package:salary_app/services/settings_service.dart';
 import '../theme/theme.dart';
@@ -74,40 +75,51 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (newPin != null && newPin.trim().isNotEmpty) {
       await SettingsService.setAdminPin(newPin.trim());
       _loadSettings();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("✅ Admin PIN updated.")),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text("✅ Admin PIN updated.")));
     }
   }
 
   Future<void> _checkForUpdates() async {
-    const String versionUrl =
-        'https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/version.json';
+    const versionUrl =
+        'https://raw.githubusercontent.com/Nofal2001/salary_app/main/version.json';
+    const currentVersion = '1.0.0'; // Update this with each release
 
     try {
       final response = await http.get(Uri.parse(versionUrl));
       if (response.statusCode == 200) {
         final remote = jsonDecode(response.body);
-        final remoteVersion = remote['version'];
-        const currentVersion =
-            '1.0.0'; // ← Replace with your actual app version
+        final latestVersion = remote['version'];
+        final downloadUrl = remote['downloadUrl'];
 
-        if (remoteVersion != currentVersion) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("⬆️ Update available: $remoteVersion")),
+        if (latestVersion != currentVersion) {
+          showDialog(
+            context: context,
+            builder: (_) => AlertDialog(
+              title: const Text("🆕 Update Available"),
+              content: Text("A new version ($latestVersion) is available."),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text("Later")),
+                ElevatedButton(
+                  onPressed: () => launchUrl(Uri.parse(downloadUrl)),
+                  child: const Text("Download"),
+                ),
+              ],
+            ),
           );
-          // Optional: Open GitHub release/download page
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("✅ You have the latest version.")),
           );
         }
       } else {
-        throw Exception("Failed to fetch version info");
+        throw Exception("Failed to load version info");
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("❌ Error checking updates: $e")),
+        SnackBar(content: Text("❌ Update check failed: $e")),
       );
     }
   }
@@ -133,18 +145,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(width: 10),
                 ElevatedButton(
-                  onPressed: _chooseExportFolder,
-                  child: const Text("Choose"),
-                )
+                    onPressed: _chooseExportFolder,
+                    child: const Text("Choose")),
               ],
             ),
           ),
           _settingRow(
             label: "Enable Auto Backup",
             child: Switch(
-              value: autoBackup,
-              onChanged: (val) => _updateSetting('autoBackup', val),
-            ),
+                value: autoBackup,
+                onChanged: (val) => _updateSetting('autoBackup', val)),
           ),
           const Divider(height: 36),
           Text("🔒 SECURITY", style: Theme.of(context).textTheme.headlineSmall),
@@ -152,9 +162,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _settingRow(
             label: "Admin PIN",
             child: ElevatedButton(
-              onPressed: _changePinDialog,
-              child: const Text("Set PIN"),
-            ),
+                onPressed: _changePinDialog, child: const Text("Set PIN")),
           ),
           const Divider(height: 36),
           Text("📝 GENERAL DISPLAY",
@@ -186,66 +194,71 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const Divider(height: 36),
           Text("📦 ADVANCED", style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: 12),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.file_upload),
-            label: const Text("Export Database"),
-            onPressed: () async {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("📤 Export logic coming soon.")),
-              );
-            },
-          ),
-          const SizedBox(height: 12),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.file_download),
-            label: const Text("Import Database"),
-            onPressed: () async {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("📥 Import logic coming soon.")),
-              );
-            },
-          ),
-          const SizedBox(height: 12),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.warning_amber),
-            label: const Text("Reset All Data"),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () async {
-              final confirm = await showDialog<bool>(
-                context: context,
-                builder: (_) => AlertDialog(
-                  title: const Text("🗑️ Confirm Reset"),
-                  content:
-                      const Text("This will delete all data. Are you sure?"),
-                  actions: [
-                    TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text("Cancel")),
-                    ElevatedButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        child: const Text("Yes, Reset")),
-                  ],
-                ),
-              );
+          Wrap(
+            spacing: 16,
+            runSpacing: 12,
+            children: [
+              ElevatedButton.icon(
+                icon: const Icon(Icons.file_upload),
+                label: const Text("Export DB"),
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text("📤 Export logic coming soon.")),
+                  );
+                },
+              ),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.file_download),
+                label: const Text("Import DB"),
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text("📥 Import logic coming soon.")),
+                  );
+                },
+              ),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.warning_amber),
+                label: const Text("Reset All"),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                onPressed: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (_) => AlertDialog(
+                      title: const Text("🗑️ Confirm Reset"),
+                      content: const Text(
+                          "This will delete all data. Are you sure?"),
+                      actions: [
+                        TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text("Cancel")),
+                        ElevatedButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: const Text("Yes, Reset")),
+                      ],
+                    ),
+                  );
 
-              if (confirm == true) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text("✅ Data reset (not implemented yet).")),
-                );
-              }
-            },
-          ),
-          const SizedBox(height: 12),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.settings_suggest),
-            label: const Text("Customize Roles"),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const RolesScreen()),
-              );
-            },
+                  if (confirm == true) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text("✅ Data reset (not implemented yet).")),
+                    );
+                  }
+                },
+              ),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.settings_suggest),
+                label: const Text("Customize Roles"),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const RolesScreen()),
+                  );
+                },
+              ),
+            ],
           ),
         ],
       ),

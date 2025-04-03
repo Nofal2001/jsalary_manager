@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:salary_app/screens/home_screen.dart';
-import 'package:salary_app/theme/theme.dart';
 import 'package:salary_app/services/settings_service.dart';
+import 'package:salary_app/services/update_service.dart';
+import 'package:salary_app/theme/theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -9,8 +10,21 @@ void main() async {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(Duration.zero, () {
+      UpdateService.checkForUpdates(context, showNoUpdateMessage: false);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

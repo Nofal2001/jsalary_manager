@@ -5,10 +5,11 @@ import 'package:url_launcher/url_launcher.dart';
 
 class UpdateService {
   static const String versionUrl =
-      'https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/version.json';
-  static const String currentVersion = '1.0.0'; // ← Change when updating
+      'https://raw.githubusercontent.com/Nofal2001/salary_app/main/version.json';
+  static const String currentVersion = '1.0.0';
 
-  static Future<void> checkForUpdates(BuildContext context) async {
+  static Future<void> checkForUpdates(BuildContext context,
+      {bool showNoUpdateMessage = true}) async {
     try {
       final response = await http.get(Uri.parse(versionUrl));
       if (response.statusCode == 200) {
@@ -17,22 +18,16 @@ class UpdateService {
         final downloadUrl = json['downloadUrl'];
 
         if (_isNewerVersion(latestVersion, currentVersion)) {
-          if (!context.mounted) return;
           _showUpdateDialog(context, latestVersion, downloadUrl);
-        } else {
-          if (!context.mounted) return;
+        } else if (showNoUpdateMessage) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("✅ You have the latest version.")),
+            const SnackBar(content: Text("✅ You're using the latest version.")),
           );
         }
       } else {
-        if (!context.mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("❌ Version file not found.")),
-        );
+        throw Exception('Failed to load version info.');
       }
     } catch (e) {
-      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("❌ Update check failed: $e")),
       );
@@ -55,28 +50,22 @@ class UpdateService {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text("🆕 Update Available"),
-        content: Text("A new version ($version) is available."),
+        title: const Text("🆕 New Update Available"),
+        content: Text(
+            "Version $version is available. Would you like to download it?"),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
             child: const Text("Later"),
+            onPressed: () => Navigator.pop(context),
           ),
-          ElevatedButton(
+          ElevatedButton.icon(
+            icon: const Icon(Icons.download),
+            label: const Text("Download"),
             onPressed: () async {
               Navigator.pop(context);
-              final uri = Uri.parse(url);
-              if (await canLaunchUrl(uri)) {
-                await launchUrl(uri, mode: LaunchMode.externalApplication);
-              } else {
-                if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text("❌ Could not open update link.")),
-                );
-              }
+              await launchUrl(Uri.parse(url),
+                  mode: LaunchMode.externalApplication);
             },
-            child: const Text("Download"),
           ),
         ],
       ),
