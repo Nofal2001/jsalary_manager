@@ -1,6 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 import 'package:salary_app/widgets/admin_pin_dialog.dart';
 import '../widgets/add_worker_dialog.dart';
 import '../widgets/calculate_salary_dialog.dart';
@@ -19,8 +22,60 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   Widget _currentView = const DashboardChart();
 
+  @override
+  void initState() {
+    super.initState();
+    _checkForUpdatesSilently();
+  }
+
   void _setView(Widget view) {
     setState(() => _currentView = view);
+  }
+
+  Future<void> _checkForUpdatesSilently() async {
+    await Future.delayed(const Duration(seconds: 1)); // Wait for context
+
+    try {
+      final response = await http.get(Uri.parse(
+        'https://raw.githubusercontent.com/Nofal2001/salary_app/main/version.json',
+      ));
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body);
+        final latestVersion = json['version'];
+        const currentVersion = '1.0.0';
+        final url = json['downloadUrl'];
+
+        if (latestVersion != currentVersion && context.mounted) {
+          final confirm = await showDialog<bool>(
+            context: context,
+            builder: (_) => AlertDialog(
+              title: const Text("🆕 Update Available"),
+              content: Text(
+                  "A new version ($latestVersion) is available.\nWould you like to download it?"),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text("Later")),
+                ElevatedButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text("Download")),
+              ],
+            ),
+          );
+
+          if (confirm == true && await canLaunchUrl(Uri.parse(url))) {
+            await launchUrl(Uri.parse(url),
+                mode: LaunchMode.externalApplication);
+          }
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("⚠️ Failed to check for updates: $e")),
+      );
+    }
   }
 
   @override
@@ -182,7 +237,7 @@ class LineChartWidget extends StatelessWidget {
     return LineChart(
       LineChartData(
         minY: 0,
-        titlesData: const FlTitlesData(show: false), // Hide all axis labels
+        titlesData: const FlTitlesData(show: false),
         gridData: const FlGridData(show: true),
         borderData: FlBorderData(show: false),
         lineBarsData: [
@@ -198,7 +253,7 @@ class LineChartWidget extends StatelessWidget {
             isCurved: true,
             color: Colors.amber.shade800,
             barWidth: 3,
-            dotData: const FlDotData(show: false), // Hide dots
+            dotData: const FlDotData(show: false),
             belowBarData: BarAreaData(
               show: true,
               color: Colors.amber.shade100.withOpacity(0.3),

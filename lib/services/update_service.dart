@@ -1,15 +1,15 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 class UpdateService {
   static const String versionUrl =
       'https://raw.githubusercontent.com/Nofal2001/salary_app/main/version.json';
-  static const String currentVersion = '1.0.0';
 
   static Future<void> checkForUpdates(BuildContext context,
-      {bool showNoUpdateMessage = true}) async {
+      {bool showNoUpdateMessage = false}) async {
     try {
       final response = await http.get(Uri.parse(versionUrl));
       if (response.statusCode == 200) {
@@ -17,20 +17,29 @@ class UpdateService {
         final latestVersion = json['version'];
         final downloadUrl = json['downloadUrl'];
 
+        final packageInfo = await PackageInfo.fromPlatform();
+        final currentVersion = packageInfo.version;
+
         if (_isNewerVersion(latestVersion, currentVersion)) {
-          _showUpdateDialog(context, latestVersion, downloadUrl);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _showUpdateDialog(context, latestVersion, downloadUrl);
+          });
         } else if (showNoUpdateMessage) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("✅ You're using the latest version.")),
-          );
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("✅ You have the latest version.")),
+            );
+          });
         }
       } else {
-        throw Exception('Failed to load version info.');
+        throw Exception('Version file not found.');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("❌ Update check failed: $e")),
-      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("❌ Update check failed: $e")),
+        );
+      });
     }
   }
 
@@ -50,22 +59,16 @@ class UpdateService {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text("🆕 New Update Available"),
-        content: Text(
-            "Version $version is available. Would you like to download it?"),
+        title: const Text("🆕 Update Available"),
+        content: Text("A new version ($version) is available."),
         actions: [
           TextButton(
-            child: const Text("Later"),
-            onPressed: () => Navigator.pop(context),
-          ),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.download),
-            label: const Text("Download"),
-            onPressed: () async {
-              Navigator.pop(context);
-              await launchUrl(Uri.parse(url),
-                  mode: LaunchMode.externalApplication);
-            },
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Later")),
+          ElevatedButton(
+            onPressed: () =>
+                launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+            child: const Text("Download"),
           ),
         ],
       ),

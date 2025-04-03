@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:salary_app/screens/roles_screen.dart';
 import 'package:salary_app/services/settings_service.dart';
 import '../theme/theme.dart';
+import 'package:package_info_plus/package_info_plus.dart'; // ⬅️ Import this at the top
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -19,6 +20,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool autoBackup = false;
   String fontSize = 'Medium';
   String? adminPin;
+  String appVersion = 'Loading...';
 
   @override
   void initState() {
@@ -28,11 +30,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _loadSettings() async {
     final pin = await SettingsService.getAdminPin();
+    final info = await PackageInfo.fromPlatform();
+
     setState(() {
       exportPath = SettingsService.get('exportPath', '');
       autoBackup = SettingsService.get('autoBackup', false);
       fontSize = SettingsService.get('fontSize', 'Medium');
       adminPin = pin;
+      appVersion = info.version;
     });
   }
 
@@ -191,6 +196,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             label: const Text("Check for Updates"),
             onPressed: _checkForUpdates,
           ),
+          const SizedBox(height: 12),
+          Text("📌 App Version: $appVersion",
+              style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic)),
           const Divider(height: 36),
           Text("📦 ADVANCED", style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: 12),
