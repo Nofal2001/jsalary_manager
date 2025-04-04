@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/material.dart';
 
 Map<String, MaterialColor> accentColors = {
   'green': Colors.green,

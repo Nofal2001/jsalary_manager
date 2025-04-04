@@ -200,7 +200,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 12),
           Text("📌 App Version: $appVersion",
-              style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic)),
+              style:
+                  const TextStyle(fontSize: 14, fontStyle: FontStyle.italic)),
           const Divider(height: 36),
           Text("📦 ADVANCED", style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: 12),
