@@ -11,6 +11,7 @@ import '../widgets/advance_payment_dialog.dart';
 import '../screens/history_main_window.dart';
 import '../theme/theme.dart';
 import 'settings_screen.dart'; // Adjust the path if needed
+import 'package:package_info_plus/package_info_plus.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -42,8 +43,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body);
-        final latestVersion = json['version'];
-        const currentVersion = '1.0.0';
+        final packageInfo = await PackageInfo.fromPlatform();
+        final currentVersion = packageInfo.version;
+        final latestVersion = json['version'].toString().trim();
         final url = json['downloadUrl'];
 
         if (latestVersion != currentVersion && context.mounted) {

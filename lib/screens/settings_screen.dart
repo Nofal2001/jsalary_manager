@@ -88,7 +88,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _checkForUpdates() async {
     const versionUrl =
         'https://raw.githubusercontent.com/Nofal2001/salary_app/main/version.json';
-    const currentVersion = '1.0.0'; // Update this with each release
 
     try {
       final response = await http.get(Uri.parse(versionUrl));
@@ -96,6 +95,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         final remote = jsonDecode(response.body);
         final latestVersion = remote['version'];
         final downloadUrl = remote['downloadUrl'];
+
+        final packageInfo = await PackageInfo.fromPlatform();
+        final currentVersion = packageInfo.version;
 
         if (latestVersion != currentVersion) {
           showDialog(
