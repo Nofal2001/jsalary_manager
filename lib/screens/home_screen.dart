@@ -42,7 +42,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       final response = await http.get(Uri.parse(
-        'https://raw.githubusercontent.com/Nofal2001/salary_app/main/version.json',
+        'https://raw.githubusercontent.com/jsalary_manager/salary_app/main/version.json',
       ));
 
       if (response.statusCode == 200) {

@@ -6,7 +6,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 class UpdateService {
   static const String versionUrl =
-      'https://raw.githubusercontent.com/Nofal2001/salary_app/main/version.json';
+      'https://raw.githubusercontent.com/Nofal2001/jsalary_manager/main/version.json';
 
   static Future<void> checkForUpdates(BuildContext context,
       {bool showNoUpdateMessage = false}) async {
