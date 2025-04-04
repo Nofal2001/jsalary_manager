@@ -14,11 +14,30 @@ class UpdateService {
       final response = await http.get(Uri.parse(versionUrl));
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body);
-        final latestVersion = json['version'];
+        final latestVersion = json['version'].toString().trim();
         final downloadUrl = json['downloadUrl'];
 
         final packageInfo = await PackageInfo.fromPlatform();
         final currentVersion = packageInfo.version;
+        // ✅ ADD THESE TWO LINES BELOW
+        print('🔍 Current Version: $currentVersion');
+        print('🆕 Latest Version from JSON: $latestVersion');
+        // 🧪 Show debug info
+        showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text("🔍 Version Debug"),
+            content: Text(
+              "Current Version: $currentVersion\nLatest from JSON: $latestVersion",
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("OK"),
+              ),
+            ],
+          ),
+        );
 
         if (_isNewerVersion(latestVersion, currentVersion)) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -44,10 +63,17 @@ class UpdateService {
   }
 
   static bool _isNewerVersion(String latest, String current) {
-    final latestParts = latest.split('.').map(int.parse).toList();
-    final currentParts = current.split('.').map(int.parse).toList();
+    print('🔍 Comparing Versions:');
+    print('Current: "$current"');
+    print('Latest : "$latest"');
 
-    for (int i = 0; i < latestParts.length; i++) {
+    final latestParts = latest.trim().split('.').map(int.parse).toList();
+    final currentParts = current.trim().split('.').map(int.parse).toList();
+
+    while (latestParts.length < 3) latestParts.add(0);
+    while (currentParts.length < 3) currentParts.add(0);
+
+    for (int i = 0; i < 3; i++) {
       if (latestParts[i] > currentParts[i]) return true;
       if (latestParts[i] < currentParts[i]) return false;
     }
