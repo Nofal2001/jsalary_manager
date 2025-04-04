@@ -14,7 +14,7 @@ import '../theme/theme.dart';
 import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  final bool disableUpdateCheck; // ✅ Added this
+  final bool disableUpdateCheck;
 
   const HomeScreen({super.key, this.disableUpdateCheck = false});
 
@@ -22,15 +22,30 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
   Widget _currentView = const DashboardChart();
+  bool _checkingUpdate = false;
+  late AnimationController _fadeController;
 
   @override
   void initState() {
     super.initState();
-    if (!widget.disableUpdateCheck) {
-      _checkForUpdatesSilently(); // ✅ Conditional update check
-    }
+
+    _fadeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!widget.disableUpdateCheck) _checkForUpdatesSilently();
+    });
+  }
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    super.dispose();
   }
 
   void _setView(Widget view) {
@@ -38,126 +53,172 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _checkForUpdatesSilently() async {
-    await Future.delayed(const Duration(seconds: 1));
+    setState(() => _checkingUpdate = true);
+    _fadeController.forward();
 
     try {
       final response = await http.get(Uri.parse(
-        'https://raw.githubusercontent.com/jsalary_manager/salary_app/main/version.json',
+        'https://raw.githubusercontent.com/Nofal2001/salary_app/main/version.json',
       ));
 
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body);
-        final packageInfo = await PackageInfo.fromPlatform();
-        final currentVersion = packageInfo.version;
         final latestVersion = json['version'].toString().trim();
-        final url = json['downloadUrl'];
+        final downloadUrl = json['downloadUrl'];
+        final currentVersion = (await PackageInfo.fromPlatform()).version;
 
         if (latestVersion != currentVersion && context.mounted) {
-          final confirm = await showDialog<bool>(
+          await showDialog(
             context: context,
             builder: (_) => AlertDialog(
               title: const Text("🆕 Update Available"),
-              content: Text(
-                  "A new version ($latestVersion) is available.\nWould you like to download it?"),
+              content: Text("A new version ($latestVersion) is available."),
               actions: [
                 TextButton(
-                    onPressed: () => Navigator.pop(context, false),
-                    child: const Text("Later")),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Later"),
+                ),
                 ElevatedButton(
-                    onPressed: () => Navigator.pop(context, true),
-                    child: const Text("Download")),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    launchUrl(Uri.parse(downloadUrl),
+                        mode: LaunchMode.externalApplication);
+                  },
+                  child: const Text("Download"),
+                ),
               ],
             ),
           );
-
-          if (confirm == true && await canLaunchUrl(Uri.parse(url))) {
-            await launchUrl(Uri.parse(url),
-                mode: LaunchMode.externalApplication);
-          }
         }
       }
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("⚠️ Failed to check for updates: $e")),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("⚠️ Update check failed: $e")),
+        );
+      }
     }
+
+    await Future.delayed(const Duration(milliseconds: 500));
+    _fadeController.reverse().whenComplete(() {
+      setState(() => _checkingUpdate = false);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppTheme.bgColor,
-      body: Row(
-        children: [
-          Container(
-            width: 220,
-            color: const Color(0xFF1A1A1A),
-            child: Column(
-              children: [
-                const SizedBox(height: 30),
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 12),
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Image.asset(
-                    'assets/logo.png',
-                    width: 100,
-                    height: 100,
-                    fit: BoxFit.contain,
-                  ),
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: AppTheme.bgColor,
+          body: Row(
+            children: [
+              Container(
+                width: 220,
+                color: const Color(0xFF1A1A1A),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 30),
+                    Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 12),
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Image.asset(
+                        'assets/logo.png',
+                        width: 100,
+                        height: 100,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SidebarButton(
+                      icon: LucideIcons.userPlus,
+                      label: 'Add Worker',
+                      onPressed: () =>
+                          _setView(const AddWorkerDialog(embed: true)),
+                    ),
+                    SidebarButton(
+                      icon: LucideIcons.calculator,
+                      label: 'Calculate Salary',
+                      onPressed: () =>
+                          _setView(const CalculateSalaryDialog(embed: true)),
+                    ),
+                    SidebarButton(
+                      icon: LucideIcons.wallet,
+                      label: 'Advance Payment',
+                      onPressed: () =>
+                          _setView(const AdvancePaymentDialog(embed: true)),
+                    ),
+                    SidebarButton(
+                      icon: LucideIcons.history,
+                      label: 'View History',
+                      onPressed: () => _setView(const HistoryMainWindow()),
+                    ),
+                    const Spacer(),
+                    SidebarButton(
+                      icon: LucideIcons.settings,
+                      label: 'Settings',
+                      onPressed: () async {
+                        final authorized =
+                            await AdminPinDialog.verifyPin(context);
+                        if (authorized) {
+                          _setView(const SettingsScreen());
+                        } else {
+                          AppTheme.showWarningSnackbar(
+                              context, "❌ Incorrect PIN");
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                SidebarButton(
-                  icon: LucideIcons.userPlus,
-                  label: 'Add Worker',
-                  onPressed: () => _setView(const AddWorkerDialog(embed: true)),
+              ),
+              Expanded(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: _currentView,
                 ),
-                SidebarButton(
-                  icon: LucideIcons.calculator,
-                  label: 'Calculate Salary',
-                  onPressed: () =>
-                      _setView(const CalculateSalaryDialog(embed: true)),
+              ),
+            ],
+          ),
+        ),
+
+        // ✅ Fancy fading spinner
+        if (_checkingUpdate)
+          FadeTransition(
+            opacity: _fadeController,
+            child: Positioned(
+              top: 12,
+              right: 12,
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color.fromARGB(221, 241, 235, 235),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                SidebarButton(
-                  icon: LucideIcons.wallet,
-                  label: 'Advance Payment',
-                  onPressed: () =>
-                      _setView(const AdvancePaymentDialog(embed: true)),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    Text("Checking for updates...",
+                        style: TextStyle(color: Colors.white, fontSize: 12)),
+                  ],
                 ),
-                SidebarButton(
-                  icon: LucideIcons.history,
-                  label: 'View History',
-                  onPressed: () => _setView(const HistoryMainWindow()),
-                ),
-                const Spacer(),
-                SidebarButton(
-                  icon: LucideIcons.settings,
-                  label: 'Settings',
-                  onPressed: () async {
-                    final authorized = await AdminPinDialog.verifyPin(context);
-                    if (authorized) {
-                      _setView(const SettingsScreen());
-                    } else {
-                      AppTheme.showWarningSnackbar(context, "❌ Incorrect PIN");
-                    }
-                  },
-                ),
-                const SizedBox(height: 20),
-              ],
+              ),
             ),
           ),
-          Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              child: _currentView,
-            ),
-          ),
-        ],
-      ),
+      ],
     );
   }
 }

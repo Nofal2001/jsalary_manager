@@ -1,6 +1,6 @@
 name: jsalary_manager
 description: Salary management app for Jordanian Stone
-version: 1.0.3+4
+version: 1.0.2+3
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
