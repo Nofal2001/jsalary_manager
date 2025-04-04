@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:salary_app/screens/home_screen.dart';
-import 'package:salary_app/services/settings_service.dart';
-import 'package:salary_app/theme/theme.dart';
+import 'package:jsalary_manager/screens/home_screen.dart';
+import 'package:jsalary_manager/services/settings_service.dart';
+import 'package:jsalary_manager/theme/theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

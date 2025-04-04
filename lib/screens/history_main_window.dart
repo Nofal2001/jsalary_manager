@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:salary_app/services/local_db_service.dart';
-import 'package:salary_app/widgets/employee_history_dialog.dart';
-import 'package:salary_app/widgets/payments_history_tab.dart';
-import 'package:salary_app/widgets/full_history_tab.dart';
-import 'package:salary_app/theme/theme.dart';
+import 'package:jsalary_manager/services/local_db_service.dart';
+import 'package:jsalary_manager/widgets/employee_history_dialog.dart';
+import 'package:jsalary_manager/widgets/payments_history_tab.dart';
+import 'package:jsalary_manager/widgets/full_history_tab.dart';
+import 'package:jsalary_manager/theme/theme.dart';
 
 class HistoryMainWindow extends StatefulWidget {
   const HistoryMainWindow({super.key});

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:salary_app/services/settings_service.dart';
+import 'package:jsalary_manager/services/settings_service.dart';
 
 class AdminPinDialog {
   static Future<bool> verifyPin(BuildContext context) async {

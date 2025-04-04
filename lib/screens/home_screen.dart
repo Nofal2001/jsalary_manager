@@ -4,17 +4,19 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
-import 'package:salary_app/widgets/admin_pin_dialog.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:jsalary_manager/widgets/admin_pin_dialog.dart';
 import '../widgets/add_worker_dialog.dart';
 import '../widgets/calculate_salary_dialog.dart';
 import '../widgets/advance_payment_dialog.dart';
 import '../screens/history_main_window.dart';
 import '../theme/theme.dart';
-import 'settings_screen.dart'; // Adjust the path if needed
-import 'package:package_info_plus/package_info_plus.dart';
+import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final bool disableUpdateCheck; // ✅ Added this
+
+  const HomeScreen({super.key, this.disableUpdateCheck = false});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -26,7 +28,9 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _checkForUpdatesSilently();
+    if (!widget.disableUpdateCheck) {
+      _checkForUpdatesSilently(); // ✅ Conditional update check
+    }
   }
 
   void _setView(Widget view) {
@@ -34,7 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _checkForUpdatesSilently() async {
-    await Future.delayed(const Duration(seconds: 1)); // Wait for context
+    await Future.delayed(const Duration(seconds: 1));
 
     try {
       final response = await http.get(Uri.parse(
@@ -86,7 +90,6 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: AppTheme.bgColor,
       body: Row(
         children: [
-          // Sidebar
           Container(
             width: 220,
             color: const Color(0xFF1A1A1A),
@@ -147,8 +150,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ),
-
-          // Main View Area
           Expanded(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 300),

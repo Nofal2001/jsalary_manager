@@ -3,8 +3,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
-import 'package:salary_app/screens/roles_screen.dart';
-import 'package:salary_app/services/settings_service.dart';
+import 'package:jsalary_manager/screens/roles_screen.dart';
+import 'package:jsalary_manager/services/settings_service.dart';
 import '../theme/theme.dart';
 import 'package:package_info_plus/package_info_plus.dart'; // ⬅️ Import this at the top
 

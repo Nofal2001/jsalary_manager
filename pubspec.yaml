@@ -1,5 +1,5 @@
-name: salary_app
-description: Salary management app for stone company
+name: jsalary_manager
+description: Salary management app for Jordanian Stone
 version: 1.0.2+3
 
 environment:
@@ -22,16 +22,14 @@ dependencies:
   # UI & Helpers
   intl: ^0.18.1
   flutter_typeahead: ^4.1.2
-
-  # Optional animations
   animations: ^2.0.7
   shimmer: ^3.0.0
   simple_animations: ^5.0.0+1
   uuid: ^4.1.0
   sqflite_common_ffi: ^2.3.0
   excel: ^2.0.6
-  lucide_icons: ^0.257.0  # For Lucide icons
-  fl_chart: ^0.65.0    # For charts
+  lucide_icons: ^0.257.0
+  fl_chart: ^0.65.0
   lottie: ^2.6.0
   shared_preferences: ^2.2.2
   file_picker: ^10.0.0
@@ -39,18 +37,21 @@ dependencies:
   url_launcher: ^6.2.5
   package_info_plus: 8.3.0
 
-
-
-
-
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
   assets:
     - assets/logo.png
 
-
+flutter_icons:
+  android: false
+  ios: false
+  web: false
+  windows:
+    generate: true
+    image_path: "assets/logo.png"
