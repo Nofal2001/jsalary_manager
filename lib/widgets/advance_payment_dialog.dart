@@ -12,6 +12,22 @@ class AdvancePaymentDialog extends StatefulWidget {
 }
 
 class _AdvancePaymentDialogState extends State<AdvancePaymentDialog> {
+  String? selectedMonth;
+  final List<String> months = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December'
+  ];
+
   final TextEditingController amountController = TextEditingController();
   List<Map<String, dynamic>> workers = [];
   String? selectedWorkerName;
@@ -90,13 +106,28 @@ class _AdvancePaymentDialogState extends State<AdvancePaymentDialog> {
                   value: selectedWorkerName,
                   decoration: _input('Worker Name'),
                   icon: const Icon(Icons.arrow_drop_down),
-                  items: workers.map<DropdownMenuItem<String>>((w) {
+                  items: workers.map((w) {
                     return DropdownMenuItem<String>(
-                      value: w['name'] as String,
+                      value: w['name'],
                       child: Text(w['name']),
                     );
                   }).toList(),
                   onChanged: (val) => setState(() => selectedWorkerName = val),
+                ),
+                const SizedBox(height: 16),
+
+                // Month Dropdown
+                DropdownButtonFormField<String>(
+                  value: selectedMonth,
+                  decoration: _input('Month of Payment'),
+                  icon: const Icon(Icons.arrow_drop_down),
+                  items: months.map((month) {
+                    return DropdownMenuItem(
+                      value: month,
+                      child: Text(month),
+                    );
+                  }).toList(),
+                  onChanged: (val) => setState(() => selectedMonth = val),
                 ),
                 const SizedBox(height: 16),
 
@@ -108,6 +139,7 @@ class _AdvancePaymentDialogState extends State<AdvancePaymentDialog> {
                 ),
 
                 const SizedBox(height: 14),
+
                 if (_statusText != null)
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -155,7 +187,8 @@ class _AdvancePaymentDialogState extends State<AdvancePaymentDialog> {
                       child: ElevatedButton.icon(
                         onPressed: () async {
                           if (selectedWorkerName == null ||
-                              amountController.text.isEmpty) {
+                              amountController.text.isEmpty ||
+                              selectedMonth == null) {
                             setState(() {
                               _statusText = "⚠ Please complete all fields.";
                               _statusColor = Colors.orange;
@@ -166,6 +199,7 @@ class _AdvancePaymentDialogState extends State<AdvancePaymentDialog> {
                           final record = {
                             'id': const Uuid().v4(),
                             'workerName': selectedWorkerName!,
+                            'month': selectedMonth!,
                             'amount':
                                 double.tryParse(amountController.text) ?? 0,
                             'timestamp': DateTime.now().toIso8601String(),

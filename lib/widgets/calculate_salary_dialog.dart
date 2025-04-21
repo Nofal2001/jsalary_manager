@@ -128,7 +128,7 @@ class _CalculateSalaryDialogState extends State<CalculateSalaryDialog> {
         previousBalance -
         advanceDeduction;
 
-    remainingBalance = totalSalary - paid;
+    remainingBalance = double.parse((totalSalary - paid).toStringAsFixed(2));
 
     setState(() {});
   }

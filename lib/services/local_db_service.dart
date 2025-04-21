@@ -27,7 +27,7 @@ class LocalDBService {
     return await databaseFactory.openDatabase(
       path,
       options: OpenDatabaseOptions(
-        version: 2, // Bump version to enable upgrade
+        version: 3, // ⬆️ Bumped version to 3
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
       ),
@@ -41,7 +41,27 @@ class LocalDBService {
   static Future<void> _onUpgrade(
       Database db, int oldVersion, int newVersion) async {
     debugPrint("⬆️ Upgrading DB from v$oldVersion to v$newVersion");
-    await _createAllTables(db);
+
+    if (oldVersion < 3) {
+      // ✅ Add 'month' column to advance_payments if not exists
+      try {
+        final result =
+            await db.rawQuery("PRAGMA table_info(advance_payments);");
+        final columns = result.map((row) => row['name']).toList();
+
+        if (!columns.contains('month')) {
+          await db
+              .execute("ALTER TABLE advance_payments ADD COLUMN month TEXT;");
+          debugPrint("✅ 'month' column added to advance_payments.");
+        } else {
+          debugPrint("ℹ️ 'month' column already exists.");
+        }
+      } catch (e) {
+        debugPrint("⚠️ Could not alter advance_payments table: $e");
+      }
+    }
+
+    await _createAllTables(db); // optional safe catch-all
   }
 
   static Future<void> _createAllTables(Database db) async {
@@ -77,13 +97,13 @@ class LocalDBService {
         id TEXT PRIMARY KEY,
         workerName TEXT NOT NULL,
         amount REAL NOT NULL,
-        timestamp TEXT
+        timestamp TEXT,
+        month TEXT  -- ✅ included here for new installs
       )
     ''');
   }
 
-  // ────────────────────────────────────────────────
-  // WORKER
+  // ─────────── WORKERS ───────────
   static Future<void> addWorker(Map<String, dynamic> workerData) async {
     final db = await database;
     await db.insert('workers', workerData);
@@ -105,8 +125,7 @@ class LocalDBService {
     return result.isNotEmpty ? result.first : null;
   }
 
-  // ────────────────────────────────────────────────
-  // SALARY
+  // ─────────── SALARY ───────────
   static Future<void> addSalaryRecord(Map<String, dynamic> record) async {
     final db = await database;
     await db.insert('salary_records', record);
@@ -114,11 +133,7 @@ class LocalDBService {
 
   static Future<void> deleteWorker(String id) async {
     final db = await database;
-    await db.delete(
-      'workers',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    await db.delete('workers', where: 'id = ?', whereArgs: [id]);
   }
 
   static Future<bool> checkIfSalaryExists({
@@ -134,21 +149,19 @@ class LocalDBService {
     return result.isNotEmpty;
   }
 
-  // ────────────────────────────────────────────────
-  // ADVANCE
+  // ─────────── ADVANCE PAYMENTS ───────────
   static Future<void> addAdvancePayment(Map<String, dynamic> data) async {
     final db = await database;
     await db.insert('advance_payments', data);
   }
 
-  // ────────────────────────────────────────────────
-  // ADMIN TOOLS
+  // ─────────── ADMIN ───────────
   static Future<void> clearAllData() async {
     final db = await database;
     await db.delete('workers');
     await db.delete('salary_records');
     await db.delete('advance_payments');
-    debugPrint("🧹 Cleared all local data.");
+    debugPrint("🧹 All data cleared.");
   }
 
   static Future<void> printAllWorkersToConsole() async {
@@ -163,14 +176,12 @@ class LocalDBService {
   static Future<void> updateWorker(Map<String, dynamic> workerData) async {
     final db = await database;
 
-    // Base update fields
     final updateFields = {
       'name': workerData['name'],
       'salary': workerData['salary'],
       'role': workerData['role'],
     };
 
-    // Conditionally include sales/profit fields for Manager/Owner
     if (workerData['role'] == 'Manager' || workerData['role'] == 'Owner') {
       updateFields['netSales'] = workerData['netSales'] ?? 0;
       updateFields['profitPercent'] = workerData['profitPercent'] ?? 0;
