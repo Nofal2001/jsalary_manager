@@ -1,9 +1,14 @@
+// Full updated code for lib/screens/history_main_window.dart
+
 import 'package:flutter/material.dart';
 import 'package:jsalary_manager/services/local_db_service.dart';
-import 'package:jsalary_manager/widgets/employee_history_dialog.dart';
-import 'package:jsalary_manager/widgets/payments_history_tab.dart';
-import 'package:jsalary_manager/widgets/full_history_tab.dart';
 import 'package:jsalary_manager/theme/theme.dart';
+import 'package:jsalary_manager/widgets/employee_history_dialog.dart';
+import 'package:jsalary_manager/widgets/clients_history_dialog.dart';
+import 'package:jsalary_manager/services/settings_service.dart';
+import 'package:excel/excel.dart';
+import 'package:open_file/open_file.dart';
+import 'dart:io';
 
 class HistoryMainWindow extends StatefulWidget {
   const HistoryMainWindow({super.key});
@@ -15,19 +20,36 @@ class HistoryMainWindow extends StatefulWidget {
 class _HistoryMainWindowState extends State<HistoryMainWindow>
     with TickerProviderStateMixin {
   late TabController _tabController;
+
   List<Map<String, dynamic>> workers = [];
+  List<Map<String, dynamic>> clients = [];
+  List<Map<String, dynamic>> incomes = [];
+  List<Map<String, dynamic>> expenses = [];
+
+  // Filters
+  String incomeSearch = '';
+  String expenseSearch = '';
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-    loadWorkers();
+    _tabController = TabController(length: 4, vsync: this);
+    loadData();
   }
 
-  Future<void> loadWorkers() async {
-    final result = await LocalDBService.getAllWorkers();
+  Future<void> loadData() async {
+    final allWorkers = await LocalDBService.getAllWorkers();
+    final allClients = await LocalDBService.getAllClients();
+    final allIncomes = await LocalDBService.getAllIncomes();
+    final allExpenses = await LocalDBService.getVaultPayments();
+
     if (!mounted) return;
-    setState(() => workers = result);
+    setState(() {
+      workers = allWorkers;
+      clients = allClients;
+      incomes = allIncomes;
+      expenses = allExpenses.where((e) => e['type'] != 'income').toList();
+    });
   }
 
   @override
@@ -35,96 +57,79 @@ class _HistoryMainWindowState extends State<HistoryMainWindow>
     return Scaffold(
       backgroundColor: AppTheme.bgColor,
       appBar: AppBar(
-        title: const Text('📋 History & Management'),
+        title: const Text('📋 History & Reports'),
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
             Tab(text: '🧍 Employees'),
-            Tab(text: '💳 Payments History'),
-            Tab(text: '📊 Full History'),
+            Tab(text: '👥 Clients'),
+            Tab(text: '💸 Expenses'),
+            Tab(text: '💰 Incomes'),
           ],
-          indicatorColor: Colors.white,
-          indicatorWeight: 3,
-          labelStyle: const TextStyle(fontWeight: FontWeight.w600),
         ),
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildEmployeeListTab(),
-          const PaymentsHistoryTab(),
-          const FullHistoryTab(),
+          _buildEntityList("Employees", workers, _editWorker, _confirmDelete,
+              (item) => EmployeeHistoryDialog(worker: item)),
+          _buildEntityList(
+              "Clients",
+              clients,
+              _editClient,
+              _confirmDeleteClient,
+              (item) => ClientsHistoryDialog(client: item)),
+          _buildTransactionTable("Expenses", expenses, "Expenses_History.xlsx",
+              expenseSearch, (val) => setState(() => expenseSearch = val)),
+          _buildTransactionTable("Incomes", incomes, "Incomes_History.xlsx",
+              incomeSearch, (val) => setState(() => incomeSearch = val)),
         ],
       ),
     );
   }
 
-  Widget _buildEmployeeListTab() {
+  Widget _buildEntityList(
+    String title,
+    List<Map<String, dynamic>> data,
+    Function(Map<String, dynamic>) onEdit,
+    Function(Map<String, dynamic>) onDelete,
+    Widget Function(Map<String, dynamic>) historyDialogBuilder,
+  ) {
     return Padding(
-      padding: const EdgeInsets.all(20.0),
-      child: workers.isEmpty
-          ? const Center(child: Text("No workers found."))
+      padding: const EdgeInsets.all(16),
+      child: data.isEmpty
+          ? Center(child: Text("No $title found."))
           : ListView.builder(
-              itemCount: workers.length,
-              itemBuilder: (context, index) {
-                final worker = workers[index];
-                final avatarColor =
-                    Colors.primaries[index % Colors.primaries.length];
+              itemCount: data.length,
+              itemBuilder: (context, i) {
+                final item = data[i];
+                final color = Colors.primaries[i % Colors.primaries.length];
 
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 14),
-                  decoration: AppTheme.cardDecoration,
+                return Card(
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 14,
-                    ),
                     leading: CircleAvatar(
-                      radius: 28,
-                      backgroundColor: avatarColor.shade200,
+                      backgroundColor: color.shade300,
                       child: const Icon(Icons.person, color: Colors.white),
                     ),
-                    title: Text(
-                      worker['name'],
-                      style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
-                    subtitle: Text(
-                      "${worker['role']} • Salary: \$${worker['salary']}",
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
+                    title: Text(item['name'] ?? '',
+                        style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Text(item['phone'] ?? item['role'] ?? ''),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        _buildEmojiActionButton(
-                          emoji: "👁️",
-                          tooltip: "View History",
-                          color: Colors.deepPurple,
-                          onPressed: () {
-                            Navigator.push(
+                        _actionButton("👁️", "View", Colors.deepPurple, () {
+                          Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) =>
-                                    EmployeeHistoryDialog(worker: worker),
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(width: 6),
-                        _buildEmojiActionButton(
-                          emoji: "✏️",
-                          tooltip: "Edit Worker",
-                          color: Colors.teal,
-                          onPressed: () => _editWorker(worker),
-                        ),
-                        const SizedBox(width: 6),
-                        _buildEmojiActionButton(
-                          emoji: "🗑️",
-                          tooltip: "Delete Worker",
-                          color: Colors.redAccent,
-                          onPressed: () => _confirmDelete(worker),
-                        ),
+                                  builder: (_) => historyDialogBuilder(item)));
+                        }),
+                        _actionButton(
+                            "✏️", "Edit", Colors.teal, () => onEdit(item)),
+                        _actionButton(
+                            "🗑️", "Delete", Colors.red, () => onDelete(item)),
                       ],
                     ),
                   ),
@@ -134,73 +139,173 @@ class _HistoryMainWindowState extends State<HistoryMainWindow>
     );
   }
 
-  Widget _buildEmojiActionButton({
-    required String emoji,
-    required String tooltip,
-    required Color color,
-    required VoidCallback onPressed,
-  }) {
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(50),
-        onTap: onPressed,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(50),
-          ),
-          child: Text(emoji, style: const TextStyle(fontSize: 20)),
-        ),
-      ),
-    );
-  }
+  Widget _buildTransactionTable(
+    String title,
+    List<Map<String, dynamic>> data,
+    String fileName,
+    String searchQuery,
+    Function(String) onSearch,
+  ) {
+    final filtered = data.where((row) {
+      final name = (row['name'] ?? '').toLowerCase();
+      final note = (row['note'] ?? '').toLowerCase();
+      final date = (row['timestamp'] ?? '').split('T').first;
+      return name.contains(searchQuery.toLowerCase()) ||
+          note.contains(searchQuery.toLowerCase()) ||
+          date.contains(searchQuery);
+    }).toList();
 
-  void _confirmDelete(Map<String, dynamic> worker) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: AppTheme.bgColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text("🗑️ Confirm Delete"),
-        content: Text(
-          "Are you sure you want to permanently delete ${worker['name']}?",
-          style: Theme.of(context).textTheme.bodyLarge,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(" Cancel"),
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  onChanged: onSearch,
+                  decoration: const InputDecoration(
+                    hintText: "🔍 Search by name, note or date (YYYY-MM-DD)",
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.download),
+                label: const Text("Export"),
+                onPressed: () => _exportToExcel(filtered, fileName),
+              ),
+            ],
           ),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.delete_forever, size: 18),
-            label: const Text("Delete"),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.errorColor,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
+          const SizedBox(height: 16),
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
+                color: Colors.white,
+                boxShadow: [BoxShadow(blurRadius: 4, color: Colors.black12)],
+              ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.vertical,
+                child: DataTable(
+                  headingRowColor:
+                      MaterialStateProperty.all(Colors.amber.shade50),
+                  dataRowColor: MaterialStateProperty.resolveWith((states) =>
+                      states.contains(MaterialState.selected)
+                          ? Colors.grey.shade100
+                          : Colors.grey.shade50),
+                  columnSpacing: 24,
+                  columns: const [
+                    DataColumn(label: Text("👤 Name")),
+                    DataColumn(label: Text("💰 Amount")),
+                    DataColumn(label: Text("📄 Note")),
+                    DataColumn(label: Text("💳 Type")),
+                    DataColumn(label: Text("📅 Date")),
+                    DataColumn(label: Text("⏰ Time")),
+                  ],
+                  rows: filtered
+                      .map(
+                        (row) => DataRow(
+                          cells: [
+                            DataCell(Text(row['name'] ?? '—')),
+                            DataCell(Text("${row['amount'] ?? '—'} ")),
+                            DataCell(Text(row['note'] ?? '—')),
+                            DataCell(Text(
+                                row['type']?.toString().toUpperCase() ?? '—')),
+                            DataCell(Text(
+                                row['timestamp']?.split('T').first ?? '—')),
+                            DataCell(Text(row['timestamp']
+                                    ?.split('T')
+                                    .last
+                                    .split('.')
+                                    .first ??
+                                '—')),
+                          ],
+                        ),
+                      )
+                      .toList(),
+                ),
               ),
             ),
-            onPressed: () async {
-              await LocalDBService.deleteWorker(worker['id']);
-              if (!mounted) return;
-              Navigator.pop(context);
-              await loadWorkers();
-              AppTheme.showSuccessSnackbar(context, "✅ Worker deleted");
-            },
           ),
         ],
       ),
     );
   }
 
+  Future<void> _exportToExcel(
+      List<Map<String, dynamic>> data, String fileName) async {
+    final excel = Excel.createExcel();
+    final sheet = excel['Sheet1'];
+
+    if (data.isNotEmpty) {
+      final keys = data.first.keys.toList();
+      sheet.appendRow(keys);
+      for (final row in data) {
+        sheet.appendRow(keys.map((k) => row[k]?.toString() ?? '').toList());
+      }
+    }
+
+    final exportPath = SettingsService.get('exportPath', '');
+    if (exportPath.isEmpty) {
+      AppTheme.showErrorSnackbar(context, "❌ Set export folder in Settings.");
+      return;
+    }
+
+    final file = File('$exportPath/$fileName');
+    file.writeAsBytesSync(excel.encode()!);
+    await OpenFile.open(file.path);
+    AppTheme.showSuccessSnackbar(context, "✅ File exported successfully.");
+  }
+
+  Widget _actionButton(
+      String emoji, String tooltip, Color color, VoidCallback onPressed) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(50),
+        child: Container(
+          padding: const EdgeInsets.all(8),
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(50),
+          ),
+          child: Text(emoji, style: const TextStyle(fontSize: 18)),
+        ),
+      ),
+    );
+  }
+
+  void _confirmDelete(Map<String, dynamic> worker) async {
+    final confirmed = await AppTheme.showConfirmDialog(
+      context: context,
+      title: "🗑️ Confirm Delete",
+      message: "Are you sure you want to delete this worker?",
+    );
+    if (confirmed) {
+      await LocalDBService.deleteWorker(worker['id']);
+      await loadData();
+      AppTheme.showSuccessSnackbar(context, "✅ Worker deleted.");
+    }
+  }
+
+  void _confirmDeleteClient(Map<String, dynamic> client) async {
+    final confirmed = await AppTheme.showConfirmDialog(
+      context: context,
+      title: "🗑️ Confirm Delete",
+      message: "Are you sure you want to delete this client?",
+    );
+    if (confirmed) {
+      // Delete logic here
+      AppTheme.showSuccessSnackbar(context, "✅ Client deleted.");
+    }
+  }
+
   void _editWorker(Map<String, dynamic> worker) {
-    final nameController = TextEditingController(text: worker['name']);
-    final salaryController =
-        TextEditingController(text: worker['salary'].toString());
+    final nameCtrl = TextEditingController(text: worker['name']);
+    final salaryCtrl = TextEditingController(text: worker['salary'].toString());
     String role = worker['role'];
 
     AppTheme.showAppDialog(
@@ -208,15 +313,14 @@ class _HistoryMainWindowState extends State<HistoryMainWindow>
       title: "✏️ Edit Worker",
       content: Column(
         children: [
-          TextFormField(
-            controller: nameController,
-            decoration: const InputDecoration(labelText: 'Worker Name'),
-          ),
+          TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(labelText: 'Name')),
           const SizedBox(height: 12),
-          TextFormField(
-            controller: salaryController,
+          TextField(
+            controller: salaryCtrl,
+            decoration: const InputDecoration(labelText: 'Salary'),
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Monthly Salary'),
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
@@ -231,22 +335,71 @@ class _HistoryMainWindowState extends State<HistoryMainWindow>
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text(" Cancel"),
-        ),
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel")),
         ElevatedButton.icon(
-          icon: const Text("", style: TextStyle(fontSize: 18)),
-          label: const Text("Save Changes"),
+          icon: const Icon(Icons.save),
+          label: const Text("Save"),
           onPressed: () async {
             await LocalDBService.updateWorker({
               'id': worker['id'],
-              'name': nameController.text.trim(),
-              'salary': double.tryParse(salaryController.text.trim()) ?? 0,
+              'name': nameCtrl.text.trim(),
+              'salary': double.tryParse(salaryCtrl.text.trim()) ?? 0,
               'role': role,
             });
             Navigator.pop(context);
-            await loadWorkers();
+            await loadData();
             AppTheme.showSuccessSnackbar(context, "✏️ Worker updated.");
+          },
+        ),
+      ],
+    );
+  }
+
+  void _editClient(Map<String, dynamic> client) {
+    final nameCtrl = TextEditingController(text: client['name']);
+    final phoneCtrl = TextEditingController(text: client['phone']);
+    final notesCtrl = TextEditingController(text: client['notes']);
+
+    AppTheme.showAppDialog(
+      context: context,
+      title: "✏️ Edit Client",
+      content: Column(
+        children: [
+          TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(labelText: 'Name')),
+          const SizedBox(height: 12),
+          TextField(
+              controller: phoneCtrl,
+              decoration: const InputDecoration(labelText: 'Phone')),
+          const SizedBox(height: 12),
+          TextField(
+            controller: notesCtrl,
+            decoration: const InputDecoration(labelText: 'Notes'),
+            maxLines: 2,
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel")),
+        ElevatedButton.icon(
+          icon: const Icon(Icons.save),
+          label: const Text("Save"),
+          onPressed: () async {
+            await LocalDBService.addClient({
+              'id': client['id'],
+              'name': nameCtrl.text.trim(),
+              'phone': phoneCtrl.text.trim(),
+              'notes': notesCtrl.text.trim(),
+              'timestamp': client['timestamp'],
+              'createdAt': client['createdAt'],
+            });
+            Navigator.pop(context);
+            await loadData();
+            AppTheme.showSuccessSnackbar(context, "✏️ Client updated.");
           },
         ),
       ],

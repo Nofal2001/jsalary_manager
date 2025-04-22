@@ -19,15 +19,13 @@ class LocalDBService {
       databaseFactory = databaseFactoryFfi;
     }
 
-    final Directory documentsDir = await getApplicationDocumentsDirectory();
-    final path = join(documentsDir.path, 'salary_app.db');
-
-    debugPrint("📍 DB Path: $path");
+    final dir = await getApplicationDocumentsDirectory();
+    final path = join(dir.path, 'salary_app.db');
 
     return await databaseFactory.openDatabase(
       path,
       options: OpenDatabaseOptions(
-        version: 3, // ⬆️ Bumped version to 3
+        version: 7, // ✅ Updated version
         onCreate: _onCreate,
         onUpgrade: _onUpgrade,
       ),
@@ -38,30 +36,90 @@ class LocalDBService {
     await _createAllTables(db);
   }
 
-  static Future<void> _onUpgrade(
-      Database db, int oldVersion, int newVersion) async {
-    debugPrint("⬆️ Upgrading DB from v$oldVersion to v$newVersion");
+  static Future<void> _onUpgrade(Database db, int oldV, int newV) async {
+    debugPrint("⬆️ DB upgrade from $oldV to $newV");
 
-    if (oldVersion < 3) {
-      // ✅ Add 'month' column to advance_payments if not exists
-      try {
-        final result =
-            await db.rawQuery("PRAGMA table_info(advance_payments);");
-        final columns = result.map((row) => row['name']).toList();
-
-        if (!columns.contains('month')) {
-          await db
-              .execute("ALTER TABLE advance_payments ADD COLUMN month TEXT;");
-          debugPrint("✅ 'month' column added to advance_payments.");
-        } else {
-          debugPrint("ℹ️ 'month' column already exists.");
-        }
-      } catch (e) {
-        debugPrint("⚠️ Could not alter advance_payments table: $e");
+    if (oldV < 3) {
+      final cols = (await db.rawQuery("PRAGMA table_info(advance_payments);"))
+          .map((e) => e['name'])
+          .toList();
+      if (!cols.contains('month')) {
+        await db.execute("ALTER TABLE advance_payments ADD COLUMN month TEXT;");
       }
     }
 
-    await _createAllTables(db); // optional safe catch-all
+    if (oldV < 4) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS clients (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          phone TEXT,
+          notes TEXT,
+          timestamp TEXT
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS incomes (
+          id TEXT PRIMARY KEY,
+          amount REAL NOT NULL,
+          notes TEXT,
+          timestamp TEXT
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS expenses (
+          id TEXT PRIMARY KEY,
+          amount REAL NOT NULL,
+          notes TEXT,
+          timestamp TEXT
+        )
+      ''');
+    }
+
+    if (oldV < 5) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS vault (
+          id TEXT PRIMARY KEY,
+          type TEXT NOT NULL,
+          name TEXT NOT NULL,
+          amount REAL NOT NULL,
+          note TEXT,
+          timestamp TEXT NOT NULL
+        )
+      ''');
+    }
+
+    if (oldV < 6) {
+      final clientCols = (await db.rawQuery("PRAGMA table_info(clients);"))
+          .map((e) => e['name'])
+          .toList();
+      if (!clientCols.contains('createdAt')) {
+        await db.execute("ALTER TABLE clients ADD COLUMN createdAt TEXT;");
+        debugPrint("✅ Added 'createdAt' to clients");
+      }
+    }
+
+    if (oldV < 7) {
+      final incomeCols = (await db.rawQuery("PRAGMA table_info(incomes);"))
+          .map((e) => e['name'])
+          .toList();
+      if (!incomeCols.contains('name')) {
+        await db.execute("ALTER TABLE incomes ADD COLUMN name TEXT;");
+        debugPrint("✅ Added 'name' column to incomes");
+      }
+
+      final expenseCols = (await db.rawQuery("PRAGMA table_info(expenses);"))
+          .map((e) => e['name'])
+          .toList();
+      if (!expenseCols.contains('name')) {
+        await db.execute("ALTER TABLE expenses ADD COLUMN name TEXT;");
+        debugPrint("✅ Added 'name' column to expenses");
+      }
+    }
+
+    await _createAllTables(db);
   }
 
   static Future<void> _createAllTables(Database db) async {
@@ -98,37 +156,62 @@ class LocalDBService {
         workerName TEXT NOT NULL,
         amount REAL NOT NULL,
         timestamp TEXT,
-        month TEXT  -- ✅ included here for new installs
+        month TEXT
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS clients (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        phone TEXT,
+        notes TEXT,
+        timestamp TEXT,
+        createdAt TEXT
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS incomes (
+        id TEXT PRIMARY KEY,
+        amount REAL NOT NULL,
+        name TEXT,
+        notes TEXT,
+        timestamp TEXT
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS expenses (
+        id TEXT PRIMARY KEY,
+        amount REAL NOT NULL,
+        name TEXT,
+        notes TEXT,
+        timestamp TEXT
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS vault (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        name TEXT NOT NULL,
+        amount REAL NOT NULL,
+        note TEXT,
+        timestamp TEXT NOT NULL
       )
     ''');
   }
 
   // ─────────── WORKERS ───────────
-  static Future<void> addWorker(Map<String, dynamic> workerData) async {
+  static Future<void> addWorker(Map<String, dynamic> data) async {
     final db = await database;
-    await db.insert('workers', workerData);
+    await db.insert('workers', data);
   }
 
   static Future<List<Map<String, dynamic>>> getAllWorkers() async {
     final db = await database;
-    return await db.query('workers');
-  }
-
-  static Future<Map<String, dynamic>?> getWorkerByName(String name) async {
-    final db = await database;
-    final result = await db.query(
-      'workers',
-      where: 'name = ?',
-      whereArgs: [name],
-      limit: 1,
-    );
-    return result.isNotEmpty ? result.first : null;
-  }
-
-  // ─────────── SALARY ───────────
-  static Future<void> addSalaryRecord(Map<String, dynamic> record) async {
-    final db = await database;
-    await db.insert('salary_records', record);
+    return db.query('workers');
   }
 
   static Future<void> deleteWorker(String id) async {
@@ -136,62 +219,139 @@ class LocalDBService {
     await db.delete('workers', where: 'id = ?', whereArgs: [id]);
   }
 
+  static Future<void> updateWorker(Map<String, dynamic> data) async {
+    final db = await database;
+    await db.update('workers', data, where: 'id = ?', whereArgs: [data['id']]);
+  }
+
+  static Future<Map<String, dynamic>?> getWorkerByName(String name) async {
+    final db = await database;
+    final res = await db.query('workers', where: 'name = ?', whereArgs: [name]);
+    return res.isNotEmpty ? res.first : null;
+  }
+
+  // ─────────── SALARY ───────────
+  static Future<void> addSalaryRecord(Map<String, dynamic> data) async {
+    final db = await database;
+    await db.insert('salary_records', data);
+  }
+
   static Future<bool> checkIfSalaryExists({
     required String workerName,
     required String month,
   }) async {
     final db = await database;
-    final result = await db.query(
+    final res = await db.query(
       'salary_records',
       where: 'workerName = ? AND month = ?',
       whereArgs: [workerName, month],
     );
-    return result.isNotEmpty;
+    return res.isNotEmpty;
   }
 
-  // ─────────── ADVANCE PAYMENTS ───────────
+  // ─────────── ADVANCE ───────────
   static Future<void> addAdvancePayment(Map<String, dynamic> data) async {
     final db = await database;
     await db.insert('advance_payments', data);
   }
 
+  // ─────────── CLIENTS ───────────
+  static Future<void> addClient(Map<String, dynamic> data) async {
+    final db = await database;
+    await db.insert('clients', data);
+  }
+
+  static Future<List<Map<String, dynamic>>> getAllClients() async {
+    final db = await database;
+    return db.query('clients');
+  }
+
+  // ─────────── INCOME ───────────
+  static Future<void> addIncome(Map<String, dynamic> data) async {
+    final db = await database;
+    await db.insert('incomes', data);
+    await db.insert('vault', {
+      'id': data['id'],
+      'type': 'income',
+      'name': data['name'] ?? 'Income',
+      'amount': data['amount'],
+      'note': data['notes'] ?? '',
+      'timestamp': data['timestamp'],
+    });
+  }
+
+  static Future<List<Map<String, dynamic>>> getAllIncomes() async {
+    final db = await database;
+    return db.query('incomes');
+  }
+
+  // ─────────── EXPENSE ───────────
+  static Future<void> addExpense(Map<String, dynamic> data) async {
+    final db = await database;
+    await db.insert('expenses', data);
+    await db.insert('vault', {
+      'id': data['id'],
+      'type': 'expense',
+      'name': data['name'] ?? 'Expense',
+      'amount': data['amount'],
+      'note': data['notes'] ?? '',
+      'timestamp': data['timestamp'],
+    });
+  }
+
+  static Future<List<Map<String, dynamic>>> getAllExpenses() async {
+    final db = await database;
+    return db.query('expenses');
+  }
+
+  // ─────────── VAULT ───────────
+  static Future<List<Map<String, dynamic>>> getVaultPayments() async {
+    final db = await database;
+    final income =
+        await db.query('vault', where: 'type = ?', whereArgs: ['income']);
+    final expense =
+        await db.query('vault', where: 'type = ?', whereArgs: ['expense']);
+    final salary = await db.query('salary_records');
+    final advances = await db.query('advance_payments');
+
+    final salaryMapped = salary.map((r) => {
+          'type': 'salary',
+          'name': r['workerName'],
+          'amount': r['amountPaid'],
+          'note': 'Salary Payment',
+          'timestamp': r['timestamp'],
+        });
+
+    final advanceMapped = advances.map((r) => {
+          'type': 'advance',
+          'name': r['workerName'],
+          'amount': r['amount'],
+          'note': 'Advance Payment',
+          'timestamp': r['timestamp'],
+        });
+
+    return [
+      ...income,
+      ...expense,
+      ...salaryMapped,
+      ...advanceMapped,
+    ]..sort((a, b) => DateTime.parse(b['timestamp'])
+        .compareTo(DateTime.parse(a['timestamp'])));
+  }
+
   // ─────────── ADMIN ───────────
   static Future<void> clearAllData() async {
     final db = await database;
-    await db.delete('workers');
-    await db.delete('salary_records');
-    await db.delete('advance_payments');
-    debugPrint("🧹 All data cleared.");
-  }
-
-  static Future<void> printAllWorkersToConsole() async {
-    final db = await database;
-    final workers = await db.query('workers');
-    debugPrint("🧠 All Workers:");
-    for (var w in workers) {
-      debugPrint(w.toString());
-    }
-  }
-
-  static Future<void> updateWorker(Map<String, dynamic> workerData) async {
-    final db = await database;
-
-    final updateFields = {
-      'name': workerData['name'],
-      'salary': workerData['salary'],
-      'role': workerData['role'],
-    };
-
-    if (workerData['role'] == 'Manager' || workerData['role'] == 'Owner') {
-      updateFields['netSales'] = workerData['netSales'] ?? 0;
-      updateFields['profitPercent'] = workerData['profitPercent'] ?? 0;
-    }
-
-    await db.update(
+    for (final table in [
       'workers',
-      updateFields,
-      where: 'id = ?',
-      whereArgs: [workerData['id']],
-    );
+      'salary_records',
+      'advance_payments',
+      'clients',
+      'incomes',
+      'expenses',
+      'vault',
+    ]) {
+      await db.delete(table);
+    }
   }
 }

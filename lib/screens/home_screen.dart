@@ -12,10 +12,13 @@ import '../widgets/advance_payment_dialog.dart';
 import '../screens/history_main_window.dart';
 import '../theme/theme.dart';
 import 'settings_screen.dart';
+import '../widgets/add_client_dialog.dart';
+import '../widgets/add_income_dialog.dart';
+import '../widgets/add_expense_dialog.dart';
+import '../screens/vault_main_window.dart';
 
 class HomeScreen extends StatefulWidget {
   final bool disableUpdateCheck;
-
   const HomeScreen({super.key, this.disableUpdateCheck = false});
 
   @override
@@ -31,12 +34,10 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   void initState() {
     super.initState();
-
     _fadeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 800),
     );
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!widget.disableUpdateCheck) _checkForUpdatesSilently();
     });
@@ -118,7 +119,7 @@ class _HomeScreenState extends State<HomeScreen>
                 color: const Color(0xFF1A1A1A),
                 child: Column(
                   children: [
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 24),
                     Container(
                       margin: const EdgeInsets.symmetric(horizontal: 12),
                       padding: const EdgeInsets.all(8),
@@ -133,12 +134,18 @@ class _HomeScreenState extends State<HomeScreen>
                         fit: BoxFit.contain,
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     SidebarButton(
                       icon: LucideIcons.userPlus,
                       label: 'Add Worker',
                       onPressed: () =>
                           _setView(const AddWorkerDialog(embed: true)),
+                    ),
+                    SidebarButton(
+                      icon: LucideIcons.users,
+                      label: 'Add Client',
+                      onPressed: () =>
+                          _setView(const AddClientDialog(embed: true)),
                     ),
                     SidebarButton(
                       icon: LucideIcons.calculator,
@@ -151,6 +158,23 @@ class _HomeScreenState extends State<HomeScreen>
                       label: 'Advance Payment',
                       onPressed: () =>
                           _setView(const AdvancePaymentDialog(embed: true)),
+                    ),
+                    SidebarButton(
+                      icon: LucideIcons.arrowDownCircle,
+                      label: 'Add Income',
+                      onPressed: () =>
+                          _setView(const AddIncomeDialog(embed: true)),
+                    ),
+                    SidebarButton(
+                      icon: LucideIcons.arrowUpCircle,
+                      label: 'Add Expense',
+                      onPressed: () =>
+                          _setView(const AddExpenseDialog(embed: true)),
+                    ),
+                    SidebarButton(
+                      icon: LucideIcons.fileBarChart2,
+                      label: 'View Vault',
+                      onPressed: () => _setView(const VaultMainWindow()),
                     ),
                     SidebarButton(
                       icon: LucideIcons.history,
@@ -172,7 +196,7 @@ class _HomeScreenState extends State<HomeScreen>
                         }
                       },
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 12),
                   ],
                 ),
               ),
@@ -186,7 +210,7 @@ class _HomeScreenState extends State<HomeScreen>
           ),
         ),
 
-        // ✅ Fancy fading spinner
+        // Update Spinner
         if (_checkingUpdate)
           FadeTransition(
             opacity: _fadeController,
@@ -196,7 +220,7 @@ class _HomeScreenState extends State<HomeScreen>
               child: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color.fromARGB(221, 241, 235, 235),
+                  color: Colors.black87,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Row(
@@ -223,45 +247,127 @@ class _HomeScreenState extends State<HomeScreen>
   }
 }
 
-class SidebarButton extends StatelessWidget {
+// ───────────────────────────────────────────────────────
+// 💡 Stylish SidebarButton
+class SidebarButton extends StatefulWidget {
   final IconData icon;
   final String label;
   final VoidCallback onPressed;
+  final Color? iconColor;
 
   const SidebarButton({
     super.key,
     required this.icon,
     required this.label,
     required this.onPressed,
+    this.iconColor,
   });
 
   @override
+  State<SidebarButton> createState() => _SidebarButtonState();
+}
+
+class _SidebarButtonState extends State<SidebarButton>
+    with SingleTickerProviderStateMixin {
+  bool _hovered = false;
+  late AnimationController _controller;
+  late Animation<double> _bounce;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    );
+
+    _bounce = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.elasticOut,
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _handleHover(bool hovering) {
+    setState(() => _hovered = hovering);
+    if (hovering) {
+      _controller.forward(from: 0);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5.0),
-      child: SizedBox(
-        width: 180,
-        height: 46,
-        child: ElevatedButton.icon(
-          onPressed: onPressed,
-          icon: Icon(icon, size: 18, color: Colors.white),
-          label: Text(
-            label,
-            style: const TextStyle(color: Colors.white, fontSize: 13.5),
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppTheme.primaryColor,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
+    return MouseRegion(
+      onEnter: (_) => _handleHover(true),
+      onExit: (_) => _handleHover(false),
+      child: AnimatedBuilder(
+        animation: _bounce,
+        builder: (context, child) {
+          return Transform.scale(
+            scale: 1.0 + (_bounce.value * 0.1),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              margin: const EdgeInsets.symmetric(vertical: 4),
+              height: 42,
+              width: 160,
+              decoration: BoxDecoration(
+                color: _hovered
+                    ? AppTheme.primaryColor.withOpacity(0.95)
+                    : AppTheme.primaryColor,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: _hovered
+                    ? [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ]
+                    : [],
+              ),
+              child: InkWell(
+                onTap: widget.onPressed,
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Row(
+                    children: [
+                      Icon(
+                        widget.icon,
+                        size: 18,
+                        color: widget.iconColor ?? Colors.white,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          widget.label,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
-            elevation: 2,
-          ),
-        ),
+          );
+        },
       ),
     );
   }
 }
 
+// ───────────────────────────────────────────────────────
+// Dashboard
 class DashboardChart extends StatelessWidget {
   const DashboardChart({super.key});
 

@@ -216,4 +216,41 @@ class AppTheme {
     if (color == errorColor) return Icons.error_outline;
     return Icons.warning_amber;
   }
+
+  // Confirmation Dialog
+  static Future<bool> showConfirmDialog({
+    required BuildContext context,
+    required String title,
+    required String message,
+    String confirmText = "Delete",
+    String cancelText = "Cancel",
+  }) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: Text(title),
+            content: Text(message),
+            backgroundColor: AppTheme.bgColor,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: Text(cancelText),
+              ),
+              ElevatedButton.icon(
+                onPressed: () => Navigator.pop(context, true),
+                icon: const Icon(Icons.delete_forever, size: 18),
+                label: Text(confirmText),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.errorColor,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
 }
