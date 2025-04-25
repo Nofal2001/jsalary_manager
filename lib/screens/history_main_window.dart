@@ -318,6 +318,11 @@ class _HistoryMainWindowState extends State<HistoryMainWindow>
     final salaryCtrl = TextEditingController(text: worker['salary'].toString());
     String role = worker['role'];
 
+    // Parse join date or use current date as fallback
+    DateTime joinDate = worker['joinDate'] != null
+        ? DateTime.parse(worker['joinDate'])
+        : DateTime.now();
+
     AppTheme.showAppDialog(
       context: context,
       title: "✏️ Edit Worker",
@@ -325,13 +330,41 @@ class _HistoryMainWindowState extends State<HistoryMainWindow>
         children: [
           TextField(
             controller: nameCtrl,
-            decoration: const InputDecoration(labelText: 'Name'),
+            decoration: const InputDecoration(labelText: 'Worker Name'),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: salaryCtrl,
-            decoration: const InputDecoration(labelText: 'Salary'),
+            decoration: const InputDecoration(labelText: 'Monthly Salary'),
             keyboardType: TextInputType.number,
+          ),
+          const SizedBox(height: 12),
+          // Add date picker for join date
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Join Date: ${DateFormat('yyyy-MM-dd').format(joinDate)}',
+                  style: TextStyle(fontSize: 16),
+                ),
+              ),
+              IconButton(
+                icon: Icon(Icons.calendar_today),
+                onPressed: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: joinDate,
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime.now(),
+                  );
+                  if (picked != null) {
+                    setState(() {
+                      joinDate = picked;
+                    });
+                  }
+                },
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
@@ -361,9 +394,13 @@ class _HistoryMainWindowState extends State<HistoryMainWindow>
               'name': newName,
               'salary': double.tryParse(salaryCtrl.text.trim()) ?? 0,
               'role': role,
+              'joinDate': joinDate.toIso8601String(),
+              // Preserve other existing fields
+              'netSales': worker['netSales'],
+              'profitPercent': worker['profitPercent'],
             });
 
-            // ✅ Also update name in vault/income/expenses
+            // Update name in all related tables
             await LocalDBService.updateNameReferences(oldName, newName);
 
             Navigator.pop(context);
@@ -414,7 +451,7 @@ class _HistoryMainWindowState extends State<HistoryMainWindow>
             final oldName = client['name'];
             final newName = nameCtrl.text.trim();
 
-            await LocalDBService.addClient({
+            await LocalDBService.updateClient({
               'id': client['id'],
               'name': newName,
               'phone': phoneCtrl.text.trim(),

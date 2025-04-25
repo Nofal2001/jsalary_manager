@@ -672,12 +672,23 @@ class LocalDBService {
       String oldName, String newName) async {
     final db = await database;
 
+    // Update in salary records
+    await db.update('salary_records', {'workerName': newName},
+        where: 'workerName = ?', whereArgs: [oldName]);
+
+    // Update in advance payments
+    await db.update('advance_payments', {'workerName': newName},
+        where: 'workerName = ?', whereArgs: [oldName]);
+
+    // Update in income records (if workers can generate income)
     await db.update('incomes', {'name': newName},
         where: 'name = ?', whereArgs: [oldName]);
 
+    // Update in expense records (if related to workers)
     await db.update('expenses', {'name': newName},
         where: 'name = ?', whereArgs: [oldName]);
 
+    // Update in vault (this covers all financial transactions)
     await db.update('vault', {'name': newName},
         where: 'name = ?', whereArgs: [oldName]);
 

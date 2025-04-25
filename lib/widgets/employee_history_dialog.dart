@@ -179,64 +179,60 @@ class _EmployeeHistoryDialogState extends State<EmployeeHistoryDialog> {
             const SizedBox(height: 12),
             Expanded(
               child: Container(
-                alignment: Alignment.center,
+                width: double.infinity,
                 decoration: AppTheme.cardDecoration,
                 padding: const EdgeInsets.all(16),
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(
-                      maxWidth: 1000, // You can adjust this width
+                  child: DataTable(
+                    headingRowColor: WidgetStateProperty.all(
+                      AppTheme.primaryColor.withOpacity(0.1),
                     ),
-                    child: DataTable(
-                      headingRowColor: WidgetStateProperty.all(
-                        AppTheme.primaryColor.withOpacity(0.1),
-                      ),
-                      headingTextStyle: Theme.of(context)
-                          .textTheme
-                          .bodyLarge!
-                          .copyWith(fontWeight: FontWeight.bold),
-                      dataRowColor: WidgetStateProperty.resolveWith((states) {
-                        return AppTheme.cardBgColor;
-                      }),
-                      columnSpacing: 20,
-                      columns: const [
-                        DataColumn(label: Center(child: Text("📅 Month"))),
-                        DataColumn(label: Center(child: Text("🚫 Absent"))),
-                        DataColumn(label: Center(child: Text("⏱ Overtime"))),
-                        DataColumn(label: Center(child: Text("🎁 Bonus"))),
-                        DataColumn(label: Center(child: Text("💵 Paid"))),
-                        DataColumn(label: Center(child: Text("🧾 Remaining"))),
-                        DataColumn(label: Center(child: Text("🔖 Type"))),
-                        DataColumn(label: Center(child: Text("📆 Date"))),
-                      ],
-                      rows: filtered.map((r) {
-                        return DataRow(
-                          color: WidgetStateProperty.all(
-                            r['type'] == 'Advance'
-                                ? Colors.red.withOpacity(0.08)
-                                : Colors.green.withOpacity(0.08),
-                          ),
-                          cells: [
-                            DataCell(Center(child: Text(r['month'] ?? ''))),
-                            DataCell(Center(
-                                child: Text(r['absentDays'].toString()))),
-                            DataCell(Center(
-                                child: Text(r['overtimeHours'].toString()))),
-                            DataCell(
-                                Center(child: Text(r['bonus'].toString()))),
-                            DataCell(Center(
-                                child: Text(r['amountPaid'].toString()))),
-                            DataCell(Center(
-                                child: Text(r['remainingBalance'].toString()))),
-                            DataCell(Center(child: Text(r['type'].toString()))),
-                            DataCell(Center(
-                                child: Text(
-                                    formatDate(r['timestamp'].toString())))),
-                          ],
-                        );
-                      }).toList(),
-                    ),
+                    headingTextStyle: Theme.of(context)
+                        .textTheme
+                        .bodyLarge!
+                        .copyWith(fontWeight: FontWeight.bold),
+                    dataRowColor: WidgetStateProperty.resolveWith((states) {
+                      return AppTheme.cardBgColor;
+                    }),
+                    columns: const [
+                      DataColumn(label: Text("📅 Month")),
+                      DataColumn(label: Text("🚫 Absent")),
+                      DataColumn(label: Text("⏱ Overtime")),
+                      DataColumn(label: Text("🎁 Bonus")),
+                      DataColumn(label: Text("💵 Paid")),
+                      DataColumn(label: Text("🧾 Remaining")),
+                      DataColumn(label: Text("🔖 Type")),
+                      DataColumn(label: Text("📆 Date")),
+                    ],
+                    rows: filtered.map((r) {
+                      String formatDate(String? input) {
+                        try {
+                          return DateFormat('d MMMM yyyy').format(
+                            DateTime.tryParse(input ?? '') ?? DateTime(2000),
+                          );
+                        } catch (_) {
+                          return 'Invalid Date';
+                        }
+                      }
+
+                      final color = r['type'] == 'Advance'
+                          ? Colors.red.withOpacity(0.08)
+                          : Colors.green.withOpacity(0.08);
+                      return DataRow(
+                        color: WidgetStateProperty.all(color),
+                        cells: [
+                          DataCell(Text(r['month'] ?? '')),
+                          DataCell(Text(r['absentDays'].toString())),
+                          DataCell(Text(r['overtimeHours'].toString())),
+                          DataCell(Text(r['bonus'].toString())),
+                          DataCell(Text(r['amountPaid'].toString())),
+                          DataCell(Text(r['remainingBalance'].toString())),
+                          DataCell(Text(r['type'].toString())),
+                          DataCell(Text(formatDate(r['timestamp'].toString()))),
+                        ],
+                      );
+                    }).toList(),
                   ),
                 ),
               ),

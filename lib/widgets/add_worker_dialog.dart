@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
-import 'package:jsalary_manager/services/local_db_service.dart';
+import '../services/local_db_service.dart';
 import '../theme/theme.dart';
 import 'package:intl/intl.dart';
 
@@ -38,10 +38,11 @@ class _AddWorkerDialogState extends State<AddWorkerDialog> {
 
     final name = nameController.text.trim();
     final bool duplicate = await isDuplicateName(name);
-    if (!mounted) return;
-
     if (duplicate) {
-      AppTheme.showErrorSnackbar(context, "❌ This worker name already exists.");
+      if (context.mounted) {
+        AppTheme.showErrorSnackbar(
+            context, "❌ This worker name already exists.");
+      }
       return;
     }
 
@@ -53,7 +54,7 @@ class _AddWorkerDialogState extends State<AddWorkerDialog> {
       'name': name,
       'salary': salary,
       'role': role,
-      'joinDate': joinDate!.toIso8601String(),
+      'createdAt': joinDate!.toIso8601String(),
     };
 
     if (role == 'Manager' || role == 'Owner') {

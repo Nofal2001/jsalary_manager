@@ -423,7 +423,7 @@ class _CalculateSalaryDialogState extends State<CalculateSalaryDialog> {
 
                     // ✅ Play "cha-ching" cashier sound
                     final player = AudioPlayer();
-                    await player.play(AssetSource('sounds/money-counter.mp3'));
+                    await player.play(AssetSource('sounds/cha_ching.mp3'));
 
                     // ✅ Clear fields, but keep the selected worker
                     overtimeController.clear();

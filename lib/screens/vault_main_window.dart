@@ -60,7 +60,7 @@ class _VaultMainWindowState extends State<VaultMainWindow> {
         final typeMatch =
             selectedType == 'All' || entry['type'] == selectedType;
         final month =
-            DateFormat('MMMM yyyy').format(DateTime.parse(entry['timestamp']));
+            DateFormat('yyyy-MM').format(DateTime.parse(entry['timestamp']));
         final monthMatch = selectedMonth == 'All' || month == selectedMonth;
         return typeMatch && monthMatch;
       }).toList();
