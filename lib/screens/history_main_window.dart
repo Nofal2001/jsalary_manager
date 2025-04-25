@@ -1,6 +1,7 @@
 // Full updated code for lib/screens/history_main_window.dart
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:jsalary_manager/services/local_db_service.dart';
 import 'package:jsalary_manager/theme/theme.dart';
 import 'package:jsalary_manager/widgets/employee_history_dialog.dart';
@@ -183,15 +184,17 @@ class _HistoryMainWindowState extends State<HistoryMainWindow>
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
                 color: Colors.white,
-                boxShadow: [BoxShadow(blurRadius: 4, color: Colors.black12)],
+                boxShadow: const [
+                  BoxShadow(blurRadius: 4, color: Colors.black12)
+                ],
               ),
               child: SingleChildScrollView(
                 scrollDirection: Axis.vertical,
                 child: DataTable(
                   headingRowColor:
-                      MaterialStateProperty.all(Colors.amber.shade50),
-                  dataRowColor: MaterialStateProperty.resolveWith((states) =>
-                      states.contains(MaterialState.selected)
+                      WidgetStateProperty.all(Colors.amber.shade50),
+                  dataRowColor: WidgetStateProperty.resolveWith((states) =>
+                      states.contains(WidgetState.selected)
                           ? Colors.grey.shade100
                           : Colors.grey.shade50),
                   columnSpacing: 24,
@@ -201,7 +204,6 @@ class _HistoryMainWindowState extends State<HistoryMainWindow>
                     DataColumn(label: Text("📄 Note")),
                     DataColumn(label: Text("💳 Type")),
                     DataColumn(label: Text("📅 Date")),
-                    DataColumn(label: Text("⏰ Time")),
                   ],
                   rows: filtered
                       .map(
@@ -212,14 +214,8 @@ class _HistoryMainWindowState extends State<HistoryMainWindow>
                             DataCell(Text(row['note'] ?? '—')),
                             DataCell(Text(
                                 row['type']?.toString().toUpperCase() ?? '—')),
-                            DataCell(Text(
-                                row['timestamp']?.split('T').first ?? '—')),
-                            DataCell(Text(row['timestamp']
-                                    ?.split('T')
-                                    .last
-                                    .split('.')
-                                    .first ??
-                                '—')),
+                            DataCell(Text(DateFormat('d MMMM yyyy')
+                                .format(DateTime.parse(row['timestamp'])))),
                           ],
                         ),
                       )
@@ -242,7 +238,14 @@ class _HistoryMainWindowState extends State<HistoryMainWindow>
       final keys = data.first.keys.toList();
       sheet.appendRow(keys);
       for (final row in data) {
-        sheet.appendRow(keys.map((k) => row[k]?.toString() ?? '').toList());
+        final rowData = keys.map((k) {
+          final value = row[k];
+          if (k == 'timestamp' && value != null) {
+            return DateFormat('d MMMM yyyy').format(DateTime.parse(value));
+          }
+          return value?.toString() ?? '';
+        }).toList();
+        sheet.appendRow(rowData);
       }
     }
 
@@ -298,7 +301,14 @@ class _HistoryMainWindowState extends State<HistoryMainWindow>
       message: "Are you sure you want to delete this client?",
     );
     if (confirmed) {
-      // Delete logic here
+      // 🔥 Delete the client from the database
+      final db = await LocalDBService.database;
+      await db.delete('clients', where: 'id = ?', whereArgs: [client['id']]);
+
+      // 🔄 Reload the data to refresh the UI
+      await loadData();
+
+      // ✅ Show feedback
       AppTheme.showSuccessSnackbar(context, "✅ Client deleted.");
     }
   }
@@ -314,8 +324,9 @@ class _HistoryMainWindowState extends State<HistoryMainWindow>
       content: Column(
         children: [
           TextField(
-              controller: nameCtrl,
-              decoration: const InputDecoration(labelText: 'Name')),
+            controller: nameCtrl,
+            decoration: const InputDecoration(labelText: 'Name'),
+          ),
           const SizedBox(height: 12),
           TextField(
             controller: salaryCtrl,
@@ -335,18 +346,26 @@ class _HistoryMainWindowState extends State<HistoryMainWindow>
       ),
       actions: [
         TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel")),
+          onPressed: () => Navigator.pop(context),
+          child: const Text("Cancel"),
+        ),
         ElevatedButton.icon(
           icon: const Icon(Icons.save),
           label: const Text("Save"),
           onPressed: () async {
+            final oldName = worker['name'];
+            final newName = nameCtrl.text.trim();
+
             await LocalDBService.updateWorker({
               'id': worker['id'],
-              'name': nameCtrl.text.trim(),
+              'name': newName,
               'salary': double.tryParse(salaryCtrl.text.trim()) ?? 0,
               'role': role,
             });
+
+            // ✅ Also update name in vault/income/expenses
+            await LocalDBService.updateNameReferences(oldName, newName);
+
             Navigator.pop(context);
             await loadData();
             AppTheme.showSuccessSnackbar(context, "✏️ Worker updated.");
@@ -367,12 +386,14 @@ class _HistoryMainWindowState extends State<HistoryMainWindow>
       content: Column(
         children: [
           TextField(
-              controller: nameCtrl,
-              decoration: const InputDecoration(labelText: 'Name')),
+            controller: nameCtrl,
+            decoration: const InputDecoration(labelText: 'Name'),
+          ),
           const SizedBox(height: 12),
           TextField(
-              controller: phoneCtrl,
-              decoration: const InputDecoration(labelText: 'Phone')),
+            controller: phoneCtrl,
+            decoration: const InputDecoration(labelText: 'Phone'),
+          ),
           const SizedBox(height: 12),
           TextField(
             controller: notesCtrl,
@@ -383,20 +404,28 @@ class _HistoryMainWindowState extends State<HistoryMainWindow>
       ),
       actions: [
         TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel")),
+          onPressed: () => Navigator.pop(context),
+          child: const Text("Cancel"),
+        ),
         ElevatedButton.icon(
           icon: const Icon(Icons.save),
           label: const Text("Save"),
           onPressed: () async {
+            final oldName = client['name'];
+            final newName = nameCtrl.text.trim();
+
             await LocalDBService.addClient({
               'id': client['id'],
-              'name': nameCtrl.text.trim(),
+              'name': newName,
               'phone': phoneCtrl.text.trim(),
               'notes': notesCtrl.text.trim(),
               'timestamp': client['timestamp'],
               'createdAt': client['createdAt'],
             });
+
+            // ✅ Update name everywhere
+            await LocalDBService.updateNameReferences(oldName, newName);
+
             Navigator.pop(context);
             await loadData();
             AppTheme.showSuccessSnackbar(context, "✏️ Client updated.");

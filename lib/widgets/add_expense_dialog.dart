@@ -1,3 +1,4 @@
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
@@ -118,7 +119,7 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
                     child: TextFormField(
                       decoration: _input("Select Date"),
                       controller: TextEditingController(
-                          text: DateFormat('yyyy-MM-dd').format(selectedDate)),
+                          text: DateFormat('d MMMM yyyy').format(selectedDate)),
                     ),
                   ),
                 ),
@@ -181,6 +182,9 @@ class _AddExpenseDialogState extends State<AddExpenseDialog> {
                         };
 
                         try {
+                          final player = AudioPlayer();
+                          await player
+                              .play(AssetSource('sounds/money-counter.mp3'));
                           await LocalDBService.addExpense(record);
                           if (!context.mounted) return;
                           if (!widget.embed) Navigator.pop(context);

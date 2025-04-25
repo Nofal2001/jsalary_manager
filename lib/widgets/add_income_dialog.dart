@@ -1,3 +1,4 @@
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
@@ -120,7 +121,7 @@ class _AddIncomeDialogState extends State<AddIncomeDialog> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(DateFormat('yyyy-MM-dd').format(selectedDate)),
+                        Text(DateFormat('d MMMM yyyy').format(selectedDate)),
                         const Icon(Icons.calendar_today, size: 18)
                       ],
                     ),
@@ -177,7 +178,6 @@ class _AddIncomeDialogState extends State<AddIncomeDialog> {
                           'id': const Uuid().v4(),
                           'amount':
                               double.tryParse(amountController.text) ?? 0.0,
-                          'month': DateFormat('MMMM').format(selectedDate),
                           'notes': notesController.text.trim(),
                           'timestamp': selectedDate.toIso8601String(),
                           'name': selectedClient,
@@ -185,8 +185,25 @@ class _AddIncomeDialogState extends State<AddIncomeDialog> {
 
                         try {
                           await LocalDBService.addIncome(income);
+
+                          // ✅ Play cha-ching sound
+                          final player = AudioPlayer();
+                          await player
+                              .play(AssetSource('sounds/cha_ching.mp3'));
+
+                          // ✅ Clear fields
+                          amountController.clear();
+                          notesController.clear();
+                          setState(() {
+                            selectedClient = null;
+                            selectedDate =
+                                DateTime.now(); // or keep last selected
+                            _statusText = null;
+                          });
+
                           if (!context.mounted) return;
                           if (!widget.embed) Navigator.pop(context);
+
                           AppTheme.showSuccessSnackbar(
                               context, "✅ Income saved!");
                         } catch (e) {

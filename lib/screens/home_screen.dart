@@ -1,5 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:jsalary_manager/services/local_db_service.dart';
+import 'package:jsalary_manager/widgets/employee_history_dialog.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:http/http.dart' as http;
@@ -27,10 +30,10 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
-  Widget _currentView = const DashboardChart();
+  Widget _currentView = const DashboardOverview();
   bool _checkingUpdate = false;
   late AnimationController _fadeController;
-
+  bool _hoveringLogo = false;
   @override
   void initState() {
     super.initState();
@@ -49,8 +52,24 @@ class _HomeScreenState extends State<HomeScreen>
     super.dispose();
   }
 
-  void _setView(Widget view) {
-    setState(() => _currentView = view);
+  void _setView(Widget newView) {
+    setState(() {
+      _currentView = AnimatedSwitcher(
+        duration: const Duration(milliseconds: 400),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, animation) {
+          return FadeTransition(
+            opacity: animation,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.97, end: 1.0).animate(animation),
+              child: child,
+            ),
+          );
+        },
+        child: newView,
+      );
+    });
   }
 
   Future<void> _checkForUpdatesSilently() async {
@@ -122,16 +141,43 @@ class _HomeScreenState extends State<HomeScreen>
                     const SizedBox(height: 24),
                     Container(
                       margin: const EdgeInsets.symmetric(horizontal: 12),
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
+                        color: Colors.white.withOpacity(0.9),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 12,
+                            spreadRadius: 1,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
                       ),
-                      child: Image.asset(
-                        'assets/logo.png',
-                        width: 100,
-                        height: 100,
-                        fit: BoxFit.contain,
+                      child: GestureDetector(
+                        onTap: () => _setView(const DashboardOverview()),
+                        child: MouseRegion(
+                          onEnter: (_) => setState(() => _hoveringLogo = true),
+                          onExit: (_) => setState(() => _hoveringLogo = false),
+                          child: TweenAnimationBuilder<double>(
+                            tween: Tween<double>(
+                                begin: 1.0, end: _hoveringLogo ? 1.08 : 1.0),
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeOutBack,
+                            builder: (context, scale, child) {
+                              return Transform.scale(
+                                scale: scale,
+                                child: child,
+                              );
+                            },
+                            child: Image.asset(
+                              'assets/logo.png',
+                              width: 90,
+                              height: 90,
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -368,8 +414,20 @@ class _SidebarButtonState extends State<SidebarButton>
 
 // ───────────────────────────────────────────────────────
 // Dashboard
-class DashboardChart extends StatelessWidget {
-  const DashboardChart({super.key});
+class DashboardOverview extends StatelessWidget {
+  const DashboardOverview({super.key});
+
+  Future<List<Map<String, dynamic>>> _getUpcomingPayments() async {
+    final workers = await LocalDBService.getAllWorkers();
+    final now = DateTime.now();
+
+    return workers.where((worker) {
+      final joinDate = DateTime.tryParse(worker['joinDate'] ?? '');
+      if (joinDate == null) return false;
+      final due = DateTime(now.year, now.month, joinDate.day);
+      return due.month == now.month;
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -387,10 +445,163 @@ class DashboardChart extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Expanded(
-            child: Container(
-              decoration: AppTheme.cardDecoration,
-              padding: const EdgeInsets.all(16),
-              child: const LineChartWidget(),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: Container(
+                    decoration: AppTheme.cardDecoration,
+                    padding: const EdgeInsets.all(16),
+                    child: const LineChartWidget(),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  flex: 1,
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: AppTheme.cardDecoration,
+                    child: FutureBuilder<List<Map<String, dynamic>>>(
+                      future: _getUpcomingPayments(),
+                      builder: (context, snapshot) {
+                        if (!snapshot.hasData) {
+                          return const Center(
+                              child: CircularProgressIndicator());
+                        }
+                        final data = snapshot.data!;
+                        if (data.isEmpty) {
+                          return const Center(
+                              child: Text("No upcoming salaries this month."));
+                        }
+                        final now = DateTime.now();
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "📅 Next Salary Payments",
+                              style: TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 12),
+                            Expanded(
+                              child: ListView.builder(
+                                itemCount: data.length,
+                                itemBuilder: (context, index) {
+                                  // Sort: Missed payments first, then upcoming
+                                  data.sort((a, b) {
+                                    final now = DateTime.now();
+                                    final dueA = DateTime(now.year, now.month,
+                                        DateTime.parse(a['joinDate']).day);
+                                    final dueB = DateTime(now.year, now.month,
+                                        DateTime.parse(b['joinDate']).day);
+
+                                    final isMissedA = dueA.isBefore(now);
+                                    final isMissedB = dueB.isBefore(now);
+
+                                    if (isMissedA && !isMissedB) return -1;
+                                    if (!isMissedA && isMissedB) return 1;
+
+                                    return dueA.compareTo(dueB);
+                                  });
+
+                                  final worker = data[index];
+                                  final join =
+                                      DateTime.parse(worker['joinDate']);
+                                  final now = DateTime.now();
+                                  final due =
+                                      DateTime(now.year, now.month, join.day);
+                                  final isMissed = due.isBefore(now);
+                                  final formattedDate =
+                                      DateFormat('d MMM').format(due);
+
+                                  return StatefulBuilder(
+                                    builder: (context, setHover) {
+                                      bool _isHovered = false;
+
+                                      return MouseRegion(
+                                        onEnter: (_) =>
+                                            setHover(() => _isHovered = true),
+                                        onExit: (_) =>
+                                            setHover(() => _isHovered = false),
+                                        child: GestureDetector(
+                                          onTap: () {
+                                            showDialog(
+                                              context: context,
+                                              builder: (_) =>
+                                                  EmployeeHistoryDialog(
+                                                      worker: worker),
+                                            );
+                                          },
+                                          child: AnimatedContainer(
+                                            duration: const Duration(
+                                                milliseconds: 250),
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 10, horizontal: 12),
+                                            margin: const EdgeInsets.only(
+                                                bottom: 10),
+                                            decoration: BoxDecoration(
+                                              borderRadius:
+                                                  BorderRadius.circular(14),
+                                              color: isMissed
+                                                  ? Colors.red.withOpacity(0.08)
+                                                  : _isHovered
+                                                      ? Colors.grey.shade100
+                                                          .withOpacity(0.5)
+                                                      : Colors.grey.shade100,
+                                              boxShadow: _isHovered
+                                                  ? [
+                                                      BoxShadow(
+                                                        color: Colors.black
+                                                            .withOpacity(0.05),
+                                                        blurRadius: 6,
+                                                        offset:
+                                                            const Offset(0, 3),
+                                                      )
+                                                    ]
+                                                  : [],
+                                            ),
+                                            child: Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment
+                                                      .spaceBetween,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    Text(worker['name'],
+                                                        style: const TextStyle(
+                                                            fontSize: 15)),
+                                                    if (isMissed) ...[
+                                                      const SizedBox(width: 6),
+                                                      const Icon(
+                                                          Icons
+                                                              .notification_important,
+                                                          color: Colors.red,
+                                                          size: 18),
+                                                    ],
+                                                  ],
+                                                ),
+                                                Text(formattedDate,
+                                                    style: const TextStyle(
+                                                        fontSize: 14,
+                                                        color: Colors.grey)),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],

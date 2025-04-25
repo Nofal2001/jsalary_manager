@@ -5,8 +5,9 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:jsalary_manager/screens/roles_screen.dart';
 import 'package:jsalary_manager/services/settings_service.dart';
+import 'package:jsalary_manager/services/local_db_service.dart';
 import '../theme/theme.dart';
-import 'package:package_info_plus/package_info_plus.dart'; // ⬅️ Import this at the top
+import 'package:package_info_plus/package_info_plus.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -18,9 +19,13 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   String exportPath = '';
   bool autoBackup = false;
+  bool darkMode = false;
+  bool dbLogging = false;
+  bool autoExportOnUpdate = true;
   String fontSize = 'Medium';
   String? adminPin;
   String appVersion = 'Loading...';
+  bool _isCheckingForUpdates = false;
 
   @override
   void initState() {
@@ -36,6 +41,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       exportPath = SettingsService.get('exportPath', '');
       autoBackup = SettingsService.get('autoBackup', false);
       fontSize = SettingsService.get('fontSize', 'Medium');
+      darkMode = SettingsService.get('darkMode', false);
+      dbLogging = SettingsService.get('dbLogging', false);
+      autoExportOnUpdate = SettingsService.get('autoExportOnUpdate', true);
       adminPin = pin;
       appVersion = info.version;
     });
@@ -86,6 +94,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _checkForUpdates() async {
+    setState(() => _isCheckingForUpdates = true);
     const versionUrl =
         'https://raw.githubusercontent.com/Nofal2001/salary_app/main/version.json';
 
@@ -95,7 +104,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         final remote = jsonDecode(response.body);
         final latestVersion = remote['version'];
         final downloadUrl = remote['downloadUrl'];
-
         final packageInfo = await PackageInfo.fromPlatform();
         final currentVersion = packageInfo.version;
 
@@ -110,26 +118,75 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onPressed: () => Navigator.pop(context),
                     child: const Text("Later")),
                 ElevatedButton(
-                  onPressed: () => launchUrl(Uri.parse(downloadUrl)),
-                  child: const Text("Download"),
-                ),
+                    onPressed: () => launchUrl(Uri.parse(downloadUrl)),
+                    child: const Text("Download")),
               ],
             ),
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("✅ You have the latest version.")),
-          );
+              const SnackBar(content: Text("✅ You have the latest version.")));
         }
       } else {
-        throw Exception("Failed to load version info");
+        throw Exception("Failed to fetch version info.");
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("❌ Update check failed: $e")),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text("❌ Update check failed: ${e.toString()}"),
+        action: SnackBarAction(label: "Retry", onPressed: _checkForUpdates),
+      ));
+    } finally {
+      setState(() => _isCheckingForUpdates = false);
     }
   }
+
+  Future<void> _showFinancialSummary() async {
+    final summary = await LocalDBService.getFinancialSummary();
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Financial Overview"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _summaryItem("Total Income", summary['totalIncome']),
+            _summaryItem("Total Expenses", summary['totalExpense']),
+            _summaryItem("Total Salaries", summary['totalSalary']),
+            _summaryItem("Total Advances", summary['totalAdvance']),
+            const Divider(),
+            _summaryItem("Net Balance", summary['netBalance'], isTotal: true),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Close"))
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryItem(String label, dynamic value, {bool isTotal = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label),
+          Text(
+            "\$${value.toStringAsFixed(2)}",
+            style: TextStyle(
+              fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+              color: isTotal ? (value >= 0 ? Colors.green : Colors.red) : null,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  // Everything remains the same above your build method...
 
   @override
   Widget build(BuildContext context) {
@@ -139,17 +196,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          Text("📂 DATA & STORAGE",
-              style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 20),
+          _section("📂 DATA & STORAGE"),
           _settingRow(
             label: "Export Folder",
             child: Row(
               children: [
                 Expanded(
-                  child: Text(exportPath.isNotEmpty ? exportPath : "Not Set",
-                      overflow: TextOverflow.ellipsis),
-                ),
+                    child: Text(exportPath.isNotEmpty ? exportPath : "Not Set",
+                        overflow: TextOverflow.ellipsis)),
                 const SizedBox(width: 10),
                 ElevatedButton(
                     onPressed: _chooseExportFolder,
@@ -164,17 +218,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onChanged: (val) => _updateSetting('autoBackup', val)),
           ),
           const Divider(height: 36),
-          Text("🔒 SECURITY", style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 12),
+          _section("🔒 SECURITY"),
           _settingRow(
             label: "Admin PIN",
             child: ElevatedButton(
                 onPressed: _changePinDialog, child: const Text("Set PIN")),
           ),
+          _settingRow(
+            label: "Enable DB Logging",
+            child: Switch(
+              value: dbLogging,
+              onChanged: (val) {
+                _updateSetting('dbLogging', val);
+                LocalDBService.enableLogging(val);
+              },
+            ),
+          ),
           const Divider(height: 36),
-          Text("📝 GENERAL DISPLAY",
-              style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 12),
+          _section("📝 GENERAL DISPLAY"),
           _settingRow(
             label: "Font Size",
             child: DropdownButton<String>(
@@ -189,85 +250,153 @@ class _SettingsScreenState extends State<SettingsScreen> {
               },
             ),
           ),
+          _settingRow(
+            label: "Dark Mode",
+            child: Switch(
+                value: darkMode,
+                onChanged: (val) => _updateSetting('darkMode', val)),
+          ),
           const Divider(height: 36),
-          Text("🌐 INTERNET & UPDATES",
-              style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 12),
+          _section("🌐 INTERNET & UPDATES"),
           ElevatedButton.icon(
             icon: const Icon(Icons.update),
             label: const Text("Check for Updates"),
-            onPressed: _checkForUpdates,
+            onPressed: _isCheckingForUpdates ? null : _checkForUpdates,
+            style: ElevatedButton.styleFrom(
+                minimumSize: const Size.fromHeight(48)),
           ),
           const SizedBox(height: 12),
           Text("📌 App Version: $appVersion",
               style:
                   const TextStyle(fontSize: 14, fontStyle: FontStyle.italic)),
+          _settingRow(
+            label: "Auto-export Before Update",
+            child: Switch(
+                value: autoExportOnUpdate,
+                onChanged: (val) => _updateSetting('autoExportOnUpdate', val)),
+          ),
           const Divider(height: 36),
-          Text("📦 ADVANCED", style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 16,
-            runSpacing: 12,
-            children: [
-              ElevatedButton.icon(
-                icon: const Icon(Icons.file_upload),
-                label: const Text("Export DB"),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text("📤 Export logic coming soon.")),
-                  );
-                },
-              ),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.file_download),
-                label: const Text("Import DB"),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text("📥 Import logic coming soon.")),
-                  );
-                },
-              ),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.warning_amber),
-                label: const Text("Reset All"),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                onPressed: () async {
-                  final confirm = await showDialog<bool>(
-                    context: context,
-                    builder: (_) => AlertDialog(
-                      title: const Text("🗑️ Confirm Reset"),
-                      content: const Text(
-                          "This will delete all data. Are you sure?"),
-                      actions: [
-                        TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text("Cancel")),
-                        ElevatedButton(
-                            onPressed: () => Navigator.pop(context, true),
-                            child: const Text("Yes, Reset")),
-                      ],
-                    ),
-                  );
+          _section("📦 ADVANCED"),
 
-                  if (confirm == true) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text("✅ Data reset (not implemented yet).")),
+          /// First row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _advancedBtn(Icons.file_upload, "Export DB", () async {
+                final path = await LocalDBService.exportDatabaseToJson();
+                _showSnack("📤 Exported to: $path");
+              }),
+              _advancedBtn(Icons.file_download, "Import DB", () async {
+                final result = await FilePicker.platform.pickFiles(
+                    type: FileType.custom, allowedExtensions: ['json']);
+                if (result != null) {
+                  final success = await LocalDBService.importDatabaseFromJson(
+                      result.files.single.path!);
+                  _showSnack(success
+                      ? "✅ Imported successfully."
+                      : "❌ Import failed.");
+                }
+              }),
+              _advancedBtn(Icons.backup, "Backup DB", () async {
+                final path = await LocalDBService.backupDatabase();
+                _showSnack("✅ Backup to: $path");
+              }),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          /// Second row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _advancedBtn(Icons.health_and_safety, "Check DB", () async {
+                final results =
+                    await LocalDBService.validateDatabaseIntegrity();
+                final allGood = results.values.every((v) => v == true);
+                _showSnack(allGood
+                    ? "✅ Database integrity check passed."
+                    : "⚠️ Issues found in database.");
+              }),
+              _advancedBtn(Icons.history, "Version Log", () async {
+                final history = await LocalDBService.getVersionHistory();
+                showDialog(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    title: const Text("Database Version History"),
+                    content: SizedBox(
+                      width: double.maxFinite,
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: history.length,
+                        itemBuilder: (context, index) {
+                          final item = history[index];
+                          return ListTile(
+                            title: Text(
+                                "v${item['oldVersion']} → v${item['newVersion']}"),
+                            subtitle: Text("Updated: ${item['updateDate']}"),
+                          );
+                        },
+                      ),
+                    ),
+                    actions: [
+                      TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text("Close"))
+                    ],
+                  ),
+                );
+              }),
+              _advancedBtn(
+                  Icons.analytics, "Financial 📊", _showFinancialSummary),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          /// Final row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.warning_amber),
+                  label: const Text("Reset All"),
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      minimumSize: const Size.fromHeight(48)),
+                  onPressed: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        title: const Text("🗑️ Confirm Reset"),
+                        content: const Text(
+                            "This will delete all data. Are you sure?"),
+                        actions: [
+                          TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text("Cancel")),
+                          ElevatedButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              child: const Text("Yes, Reset")),
+                        ],
+                      ),
                     );
-                  }
-                },
+                    if (confirm == true) {
+                      await LocalDBService.clearAllData();
+                      _showSnack("✅ Data reset complete.");
+                    }
+                  },
+                ),
               ),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.settings_suggest),
-                label: const Text("Customize Roles"),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const RolesScreen()),
-                  );
-                },
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.settings_suggest),
+                  label: const Text("Customize Roles"),
+                  onPressed: () => Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const RolesScreen())),
+                  style: ElevatedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(48)),
+                ),
               ),
             ],
           ),
@@ -276,6 +405,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  /// Helper section title
+  Widget _section(String title) => Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Text(title, style: Theme.of(context).textTheme.headlineSmall),
+      );
+
+  /// Helper for key-value settings rows
   Widget _settingRow({required String label, required Widget child}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -289,5 +425,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  /// Reusable button layout
+  Widget _advancedBtn(IconData icon, String label, VoidCallback onPressed) {
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: ElevatedButton.icon(
+          icon: Icon(icon, size: 18),
+          label: Text(label, overflow: TextOverflow.ellipsis),
+          onPressed: onPressed,
+          style:
+              ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+        ),
+      ),
+    );
+  }
+
+  /// Helper to show snack
+  void _showSnack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 }

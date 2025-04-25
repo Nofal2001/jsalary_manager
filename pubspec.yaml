@@ -1,6 +1,6 @@
 name: jsalary_manager
 description: Salary management app for Jordanian Stone
-version: 1.0.4+5
+version: 1.0.5+6
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -37,6 +37,8 @@ dependencies:
   url_launcher: ^6.2.5
   package_info_plus: 8.3.0
   open_file: ^3.5.10
+  audioplayers: ^5.2.1
+
 
 dev_dependencies:
   flutter_test:
@@ -48,6 +50,11 @@ flutter:
   uses-material-design: true
   assets:
     - assets/logo.png
+    - assets/sounds/cha_ching.mp3
+    - assets/sounds/money-counter.mp3
+
+
+
 
 flutter_icons:
   android: false

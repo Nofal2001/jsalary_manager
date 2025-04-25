@@ -57,7 +57,7 @@ class _ClientsHistoryDialogState extends State<ClientsHistoryDialog> {
 
     for (final r in records) {
       final date =
-          DateFormat('y/MM/dd – HH:mm').format(DateTime.parse(r['timestamp']));
+          DateFormat('d MMMM yyyy').format(DateTime.parse(r['timestamp']));
       sheet.appendRow(
           [r['note'] ?? '', r['amount'].toString(), r['type'] ?? '', date]);
     }
@@ -132,44 +132,40 @@ class _ClientsHistoryDialogState extends State<ClientsHistoryDialog> {
             ),
             const SizedBox(height: 20),
             Expanded(
-              child: Container(
-                width: double.infinity,
-                decoration: AppTheme.cardDecoration,
-                padding: const EdgeInsets.all(16),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: DataTable(
-                    headingRowColor: WidgetStateProperty.all(
-                        AppTheme.primaryColor.withOpacity(0.1)),
-                    headingTextStyle: Theme.of(context)
-                        .textTheme
-                        .bodyLarge!
-                        .copyWith(fontWeight: FontWeight.bold),
-                    dataRowColor: WidgetStateProperty.all(AppTheme.cardBgColor),
-                    columns: [
-                      DataColumn(
-                          label: const Text("📝 Note"),
-                          onSort: (_, __) => _onSort('note')),
-                      DataColumn(
-                          label: const Text("💰 Amount"),
-                          onSort: (_, __) => _onSort('amount')),
-                      DataColumn(
-                          label: const Text("🔖 Type"),
-                          onSort: (_, __) => _onSort('type')),
-                      DataColumn(
-                          label: const Text("📅 Date"),
-                          onSort: (_, __) => _onSort('timestamp')),
-                    ],
-                    rows: records.map((r) {
-                      final date = DateFormat('y/MM/dd – HH:mm')
-                          .format(DateTime.parse(r['timestamp']));
-                      return DataRow(cells: [
-                        DataCell(Text(r['note'] ?? '-')),
-                        DataCell(Text("${r['amount']}")),
-                        DataCell(Text(r['type'] ?? 'Unknown')),
-                        DataCell(Text(date)),
-                      ]);
-                    }).toList(),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Align(
+                  alignment: Alignment.center,
+                  child: ConstrainedBox(
+                    constraints:
+                        const BoxConstraints(maxWidth: 900), // Adjust as needed
+                    child: DataTable(
+                      headingRowColor: WidgetStateProperty.all(
+                        AppTheme.primaryColor.withOpacity(0.1),
+                      ),
+                      headingTextStyle: Theme.of(context)
+                          .textTheme
+                          .bodyLarge!
+                          .copyWith(fontWeight: FontWeight.bold),
+                      dataRowColor:
+                          WidgetStateProperty.all(AppTheme.cardBgColor),
+                      columns: const [
+                        DataColumn(label: Center(child: Text("📝 Note"))),
+                        DataColumn(label: Center(child: Text("💰 Amount"))),
+                        DataColumn(label: Center(child: Text("🔖 Type"))),
+                        DataColumn(label: Center(child: Text("📅 Date"))),
+                      ],
+                      rows: records.map((r) {
+                        final date = DateFormat('d MMMM yyyy')
+                            .format(DateTime.parse(r['timestamp']));
+                        return DataRow(cells: [
+                          DataCell(Center(child: Text(r['note'] ?? '-'))),
+                          DataCell(Center(child: Text("${r['amount']}"))),
+                          DataCell(Center(child: Text(r['type'] ?? 'Unknown'))),
+                          DataCell(Center(child: Text(date))),
+                        ]);
+                      }).toList(),
+                    ),
                   ),
                 ),
               ),

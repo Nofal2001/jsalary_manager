@@ -1,5 +1,3 @@
-import 'dart:io';
-import 'package:excel/excel.dart' as excel;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/local_db_service.dart';
@@ -62,7 +60,7 @@ class _VaultMainWindowState extends State<VaultMainWindow> {
         final typeMatch =
             selectedType == 'All' || entry['type'] == selectedType;
         final month =
-            DateFormat('yyyy-MM').format(DateTime.parse(entry['timestamp']));
+            DateFormat('MMMM yyyy').format(DateTime.parse(entry['timestamp']));
         final monthMatch = selectedMonth == 'All' || month == selectedMonth;
         return typeMatch && monthMatch;
       }).toList();
@@ -94,7 +92,7 @@ class _VaultMainWindowState extends State<VaultMainWindow> {
             Text(label, style: TextStyle(fontSize: 14, color: color)),
             const SizedBox(height: 6),
             Text(
-              "${value.toStringAsFixed(2)}",
+              value.toStringAsFixed(2),
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
@@ -316,7 +314,7 @@ class _VaultMainWindowState extends State<VaultMainWindow> {
                               ? Colors.orange
                               : Colors.redAccent));
 
-                  final time = DateFormat('MMM d, yyyy – hh:mm a')
+                  final time = DateFormat('d MMMM yyyy')
                       .format(DateTime.parse(p['timestamp']));
 
                   return GestureDetector(
@@ -358,7 +356,7 @@ class _VaultMainWindowState extends State<VaultMainWindow> {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(
-                            "${(p['amount'] as num).toStringAsFixed(2)}",
+                            (p['amount'] as num).toStringAsFixed(2),
                             style: TextStyle(
                                 color: color,
                                 fontWeight: FontWeight.bold,

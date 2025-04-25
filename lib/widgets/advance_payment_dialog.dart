@@ -1,7 +1,9 @@
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../services/local_db_service.dart';
 import '../theme/theme.dart';
+import 'package:intl/intl.dart';
 
 class AdvancePaymentDialog extends StatefulWidget {
   final bool embed;
@@ -13,20 +15,6 @@ class AdvancePaymentDialog extends StatefulWidget {
 
 class _AdvancePaymentDialogState extends State<AdvancePaymentDialog> {
   String? selectedMonth;
-  final List<String> months = [
-    'January',
-    'February',
-    'March',
-    'April',
-    'May',
-    'June',
-    'July',
-    'August',
-    'September',
-    'October',
-    'November',
-    'December'
-  ];
 
   final TextEditingController amountController = TextEditingController();
   List<Map<String, dynamic>> workers = [];
@@ -39,6 +27,8 @@ class _AdvancePaymentDialogState extends State<AdvancePaymentDialog> {
   void initState() {
     super.initState();
     loadWorkers();
+
+    selectedMonth = null;
   }
 
   Future<void> loadWorkers() async {
@@ -116,27 +106,53 @@ class _AdvancePaymentDialogState extends State<AdvancePaymentDialog> {
                 ),
                 const SizedBox(height: 16),
 
-                // Month Dropdown
-                DropdownButtonFormField<String>(
-                  value: selectedMonth,
-                  decoration: _input('Month of Payment'),
-                  icon: const Icon(Icons.arrow_drop_down),
-                  items: months.map((month) {
-                    return DropdownMenuItem(
-                      value: month,
-                      child: Text(month),
+                // Styled Date Picker Like TextField
+                GestureDetector(
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now(),
+                      firstDate: DateTime(2022),
+                      lastDate: DateTime(2030),
+                      helpText: 'Select Payment Date',
                     );
-                  }).toList(),
-                  onChanged: (val) => setState(() => selectedMonth = val),
+
+                    if (picked != null) {
+                      setState(() {
+                        selectedMonth =
+                            DateFormat('d MMMM yyyy').format(picked);
+                      });
+                    }
+                  },
+                  child: InputDecorator(
+                    decoration: _input("Select Date"),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          selectedMonth ?? 'dd/MM/yyyy',
+                          style: TextStyle(
+                            color: selectedMonth == null
+                                ? Colors.grey
+                                : Colors.black87,
+                            fontSize: 14.5,
+                          ),
+                        ),
+                        const Icon(Icons.calendar_today,
+                            size: 18, color: Colors.grey),
+                      ],
+                    ),
+                  ),
                 ),
+
                 const SizedBox(height: 16),
 
                 // Amount
                 TextField(
-                  controller: amountController,
-                  decoration: _input('Advance Amount'),
-                  keyboardType: TextInputType.number,
-                ),
+                    controller: amountController,
+                    decoration: _input('Advance Amount'),
+                    keyboardType: TextInputType.number,
+                    style: Theme.of(context).textTheme.bodyMedium),
 
                 const SizedBox(height: 14),
 
@@ -202,13 +218,29 @@ class _AdvancePaymentDialogState extends State<AdvancePaymentDialog> {
                             'month': selectedMonth!,
                             'amount':
                                 double.tryParse(amountController.text) ?? 0,
-                            'timestamp': DateTime.now().toIso8601String(),
+                            'timestamp': DateFormat('d MMMM yyyy')
+                                .parse(selectedMonth!)
+                                .toIso8601String()
                           };
 
                           try {
                             await LocalDBService.addAdvancePayment(record);
+
+                            // ✅ Play cha-ching sound
+                            final player = AudioPlayer();
+                            await player
+                                .play(AssetSource('sounds/money-counter.mp3'));
+
+                            // ✅ Clear fields (except selectedWorkerName)
+                            amountController.clear();
+                            setState(() {
+                              selectedMonth = null;
+                              _statusText = null;
+                            });
+
                             if (!context.mounted) return;
                             if (!widget.embed) Navigator.pop(context);
+
                             AppTheme.showSuccessSnackbar(
                                 context, "✅ Payment saved!");
                           } catch (e) {
@@ -219,7 +251,7 @@ class _AdvancePaymentDialogState extends State<AdvancePaymentDialog> {
                           }
                         },
                         icon: const Text("➕", style: TextStyle(fontSize: 18)),
-                        label: const Text("Add Payment"),
+                        label: const Text("Pay in advance"),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.primaryColor,
                           foregroundColor: Colors.white,

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
-import '../services/local_db_service.dart';
+import 'package:jsalary_manager/services/local_db_service.dart';
 import '../theme/theme.dart';
+import 'package:intl/intl.dart';
 
 class AddWorkerDialog extends StatefulWidget {
   final bool embed;
@@ -28,15 +29,19 @@ class _AddWorkerDialogState extends State<AddWorkerDialog> {
   }
 
   Future<void> saveWorker() async {
+    if (joinDate == null) {
+      AppTheme.showErrorSnackbar(context, "📅 Please select a join date.");
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) return;
 
     final name = nameController.text.trim();
     final bool duplicate = await isDuplicateName(name);
+    if (!mounted) return;
+
     if (duplicate) {
-      if (context.mounted) {
-        AppTheme.showErrorSnackbar(
-            context, "❌ This worker name already exists.");
-      }
+      AppTheme.showErrorSnackbar(context, "❌ This worker name already exists.");
       return;
     }
 
@@ -48,7 +53,7 @@ class _AddWorkerDialogState extends State<AddWorkerDialog> {
       'name': name,
       'salary': salary,
       'role': role,
-      'createdAt': DateTime.now().toIso8601String(),
+      'joinDate': joinDate!.toIso8601String(),
     };
 
     if (role == 'Manager' || role == 'Owner') {
@@ -136,6 +141,27 @@ class _AddWorkerDialogState extends State<AddWorkerDialog> {
                     },
                   ),
                   const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: InputDecorator(
+                          decoration:
+                              const InputDecoration(labelText: 'Join Date'),
+                          child: Text(
+                            joinDate != null
+                                ? DateFormat('d MMMM yyyy').format(joinDate!)
+                                : 'Select date',
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.calendar_today),
+                        onPressed: _pickJoinDate,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
 
                   // Role
                   DropdownButtonFormField<String>(
@@ -212,5 +238,20 @@ class _AddWorkerDialogState extends State<AddWorkerDialog> {
     return widget.embed
         ? content
         : Dialog(insetPadding: const EdgeInsets.all(40), child: content);
+  }
+
+  DateTime? joinDate; // Default to today
+
+  Future<void> _pickJoinDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: joinDate ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+    );
+
+    if (picked != null) {
+      setState(() => joinDate = picked);
+    }
   }
 }
